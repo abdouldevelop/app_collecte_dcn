@@ -1,0 +1,6 @@
+
+declare module '@nozbe/watermelondb' {
+  interface DatabaseOptions {
+    actionsEnabled?: boolean;
+  }
+}
