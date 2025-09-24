@@ -24,7 +24,7 @@ const clientKitItem = ({client, kit, subs, payments}: Props) => {
   const totalPaid = payments?.reduce((sum, p) => sum + p.montant, 0);
   const remaining = kit.montantTotal - totalPaid;
   const progress = (totalPaid / kit.montantTotal) * 100;
-
+  
    return (
     <View style={styles.container}>
       <Pressable

@@ -17,7 +17,7 @@ type Props = {
 }
 
 const LastedClients = ({clients}: Props) => {
-
+  
   
   return (
     <View style={styles.card} >

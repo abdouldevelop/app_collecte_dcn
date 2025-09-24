@@ -39,7 +39,7 @@ const Page = ({clients, subscriptions, kits}: Props) => {
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  console.log("9999999999999999999999999999999", subscriptions)
+  // console.log("9999999999999999999999999999999", subscriptions)
 
   // Filter subscriptions based on selected kit
   const filteredSubscriptions = selectedKitId 
@@ -64,13 +64,13 @@ const Page = ({clients, subscriptions, kits}: Props) => {
         ]}
         // android_ripple={{ color: colors.gloryColor.c_1 + '20' }}
       >
-        <View style={styles.kitIconContainer}>
+        <View style={[styles.kitIconContainer, { backgroundColor: !isSelected ? colors.gloryColor.c_1 : 'white' }]}>
           {/* <Feather 
             name="package" 
             size={16} 
             color={isSelected ? 'white' : colors.gloryColor.c_1} 
           /> */}
-          <Text style={{fontSize: SIZES.xs}} >{subscriptionsCount}</Text>
+          <Text style={{fontSize: SIZES.xs, color: !isSelected ? 'white' : 'black'}} >{subscriptionsCount}</Text>
         </View>
         
         <ThemedText style={[
@@ -93,6 +93,7 @@ const Page = ({clients, subscriptions, kits}: Props) => {
         searchQuery={searchQuery} 
         setSearchQuery={setSearchQuery} 
       /> */}
+      
    
       <FlatBtn action={() => bottomSheetModalRef.current?.present()} />
 
@@ -174,7 +175,7 @@ const Page = ({clients, subscriptions, kits}: Props) => {
 
         {subscriptions?.length === 0 && !selectedKitId && (
           <SubscriptionEmptyPay 
-            title='Aucune souscription enregistrée' 
+            title="Aucun client n'a souscrit "
             icon='👤'
           />
         )}

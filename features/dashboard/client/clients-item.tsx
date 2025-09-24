@@ -16,7 +16,7 @@ type Props = {
 
 const ClientItem = ({client, souscriptions}: Props) => {
 
-    console.log("+++++++++++", souscriptions)
+    console.log("+++++++++++", client.id)
     const router = useRouter()
 
   return (

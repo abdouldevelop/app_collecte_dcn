@@ -37,10 +37,30 @@ const Page = ({versements, souscriptions, kits}: Props) => {
  const router = useRouter()
  const {logout} = agentStore();
   
- useEffect(() => {
+ useEffect( () => {
   // syncWithBackend()
-    //  clearAllDatabase()
+//  clearAllDatabase()
+ getKits()
 },  [])
+
+async function getKits(){
+  const kits = await database.get<Kit>('kits').query()
+    if(kits.length > 0){
+      // alert("it exists")
+    }else{
+       const kitData = [
+        {label: "Kit 1", montantTotal: 1000},
+        {label: "Kit 2", montantTotal: 2000},
+        {label: "Kit 3", montantTotal: 3000},
+        {label: "Kit 4", montantTotal: 4000},
+        {label: "Kit 5", montantTotal: 5000},
+       ]
+
+       for (const kit of kitData) {
+        await createKit(kit)
+      }
+    }
+}
 
  const clearAllDatabase = async () => {
   await database.write(async () => {
@@ -55,19 +75,19 @@ const Page = ({versements, souscriptions, kits}: Props) => {
   });
 };
 
-async function createKit(){
+async function createKit(data:{label: string, montantTotal: number}) {
 
   try {
     return database.write(async () => {
     const client = await database.get<Kit>('kits').create((kit) => {
-         kit.label = "tranquilité"
+         kit.label = data.label
          kit.saisonId = "1"
-         kit.montantTotal = 1000
+         kit.montantTotal = data.montantTotal
          
    })
    
 
-   console.log("=============", client)
+  //  console.log("=============", client)
 
    return client
    })
@@ -88,14 +108,14 @@ async function createKit(){
         Saison 2
       </ThemedText>
 
-      <Button 
+      {/* <Button 
       title='Ajouter un kit'
       onPress={() => {
         // logout()
         // syncWithBackend()
         createKit()
       }}
-      />
+      /> */}
      
       <DashCard
       label='Versements du jour'
