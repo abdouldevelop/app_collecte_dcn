@@ -1,69 +1,85 @@
-import { StyleSheet, Text, View } from 'react-native'
-import React from 'react'
-import { ThemedText } from '@/components/ThemedText'
-import { colors, formatXOF, Rs, SIZES } from '@/shared/utils'
-import Versement from '@/database/model/versement'
-import { database } from '@/database/database'
-import { Q } from '@nozbe/watermelondb'
-import { withObservables } from '@nozbe/watermelondb/react'
-import Souscription from '@/database/model/Souscription'
-import Client from '@/database/model/Client'
-import Kit from '@/database/model/Kit'
+import { View, Text } from 'react-native';
+import React from 'react';
+import { formatXOF } from '@/shared/utils';
+import Versement from '@/database/model/versement';
+import { database } from '@/database/database';
+import { withObservables } from '@nozbe/watermelondb/react';
+import Souscription from '@/database/model/Souscription';
+import Client from '@/database/model/Client';
+import Kit from '@/database/model/Kit';
+import { Ionicons } from '@expo/vector-icons';
+import { useAppTheme } from '@/theme';
 
 type Props = {
- versement: Versement
-}
+  versement: Versement;
+};
 
-const PaymentItem = ({versement}: Props) => {
-
- const [client, setClient] = React.useState<Client>();
- const [sub, setSub] = React.useState<Souscription>();
- const [kit, setKit] = React.useState<Kit>();
-
+const PaymentItem = ({ versement }: Props) => {
+  const { colors, spacing, typography } = useAppTheme();
+  const [client, setClient] = React.useState<Client>();
+  const [kit, setKit] = React.useState<Kit>();
 
   React.useEffect(() => {
-    database.get<Souscription>('souscriptions').find(versement.souscriptionId)
-    .then( (sub) => {     
-     setSub(sub)
-    })
-    .catch(() => console.log('No souscription found'))
-    
-    if(sub){
+    let cancelled = false;
 
-     database.get<Client>('clients').find(sub.clientId)
-    .then( client => setClient(client))
-    .catch(() => console.log('No client found'))
+    async function loadRelated() {
+      try {
+        const sub = await database
+          .get<Souscription>('souscriptions')
+          .find(versement.souscriptionId);
 
-    database.get<Kit>('kits').find(sub.kitId)
-    .then( kit => setKit(kit))
-    .catch(() => console.log('No kit found'))
+        if (cancelled) return;
 
+        const [foundClient, foundKit] = await Promise.all([
+          database.get<Client>('clients').find(sub.clientId),
+          database.get<Kit>('kits').find(sub.kitId),
+        ]);
+
+        if (!cancelled) {
+          setClient(foundClient);
+          setKit(foundKit);
+        }
+      } catch {
+        // silently ignore if records not found
+      }
     }
-  }, [versement, sub])
+
+    loadRelated();
+    return () => { cancelled = true; };
+  }, [versement.souscriptionId]);
 
   return (
-    <View style={{gap: Rs(5), borderBottomWidth: 1, borderBottomColor: "white", paddingBottom: Rs(15) }} >
-      <Text style={{fontSize: SIZES.mx, color: colors.textColor}}>
-       {kit?.label}
-      </Text>
-      <ThemedText style={{fontSize: SIZES.md, fontWeight: "600", color: colors.titleColor}} >{formatXOF(versement?.montant)}</ThemedText>
-      <View style={{flexDirection: "row", justifyContent: "space-between", alignItems: "center"}} >
-        <Text style={{fontSize: SIZES.mx, color: colors.textColor}}>{client?.firstName} </Text>
-        <Text style={{fontSize: SIZES.mx, color: colors.dashitem.t_1}} >
-          {new Date(versement.createdAt).toLocaleString()} 
-          </Text>
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.md,
+        paddingVertical: spacing.sm,
+      }}
+    >
+      <Ionicons name="checkmark-circle" size={18} color={colors.success} />
 
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs }}>
+          <Text style={[typography.labelLarge, { color: colors.onSurface }]}>
+            {formatXOF(versement?.montant)}
+          </Text>
+          {kit?.label && (
+            <Text style={[typography.caption, { color: colors.primary }]}>
+              {kit.label}
+            </Text>
+          )}
+        </View>
+        <Text style={[typography.caption, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
+          {client ? `${client.firstName} ${client.lastName}` : '...'} · {new Date(versement.createdAt).toLocaleDateString()}
+        </Text>
       </View>
     </View>
-  )
-}
+  );
+};
 
-const enhance = withObservables(['versement'], ({versement}:{versement: Versement}) => ({
-  versements: versement ? versement.observe() : null,
-  // client: database.get<Souscription>('souscriptions').find(versement.souscriptionId)
-  // .then( sub => sub.client).catch(() => console.log('No client found'))
-}))
+const enhance = withObservables(['versement'], ({ versement }: { versement: Versement }) => ({
+  versement: versement ? versement.observe() : null,
+}));
 
-export default enhance(PaymentItem)
-
-const styles = StyleSheet.create({})
+export default enhance(PaymentItem);

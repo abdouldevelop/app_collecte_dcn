@@ -1,170 +1,207 @@
-import ScreenWrapper from '@/components/ScreenWrapper'
-import { database } from '@/database/database'
-import Client from '@/database/model/Client'
-import DashCard from '@/features/dashboard/dash-core/dash-card'
-import { useClients } from '@/hooks/app/useClient'
-import { Feather, FontAwesome5, FontAwesome6 } from '@expo/vector-icons'
-import React, { useEffect, useState } from 'react'
-import { View, Text, Button, TextInput, FlatList, ScrollView } from 'react-native'
-import { ThemedText } from '@/components/ThemedText';
-import { colors, formatXOF, Rs, SIZES } from '@/shared/utils'
-import { Colors } from '@/constants/Colors'
-import CustomBtn from '@/components/form/CustomBtn'
-import EnhancedLastedClients from '@/features/dashboard/dash-core/new-client'
-import { useSouscription, useSouscriptions } from '@/hooks/app/useSubscription'
-import Saison from '@/database/model/Saison'
-import Kit from '@/database/model/Kit'
-import Souscription from '@/database/model/Souscription'
-import Agent from '@/database/model/Agent'
-import EnhancedLastedPayments from '@/features/dashboard/dash-core/recent-payment'
-import { withObservables } from '@nozbe/watermelondb/react'
-import Versement from '@/database/model/versement'
-import { syncWithBackend } from '@/database/db_utils'
-import { useRouter } from 'expo-router'
-import { agentStore } from '@/storage/MMKV'
+import React, { useEffect } from 'react';
+import { View, Text, Pressable } from 'react-native';
+import { Feather, Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { withObservables } from '@nozbe/watermelondb/react';
 
+import { useAppTheme } from '@/theme';
+import { AppBadge } from '@/components/ui';
+import { database } from '@/database/database';
+import { formatXOF } from '@/shared/utils';
+import { agentStore } from '@/storage/MMKV';
+import { syncWithBackend } from '@/database/db_utils';
+
+import EnhancedLastedClients from '@/features/dashboard/dash-core/new-client';
+import EnhancedLastedPayments from '@/features/dashboard/dash-core/recent-payment';
+import SyncButton from '@/components/SyncButton';
+import Versement from '@/database/model/versement';
+import Souscription from '@/database/model/Souscription';
+import Kit from '@/database/model/Kit';
+import Saison from '@/database/model/Saison';
 
 type Props = {
-  versements?: Versement[]
-  souscriptions?: Souscription[]
-  kits?: Kit[]
-}
-
-const Page = ({versements, souscriptions, kits}: Props) => {  
-
- const totalAmount = versements?.reduce((acc, cur) => acc + cur.montant, 0)
-
- const router = useRouter()
- const {logout} = agentStore();
-  
- useEffect( () => {
-  // syncWithBackend()
-//  clearAllDatabase()
- getKits()
-},  [])
-
-async function getKits(){
-  const kits = await database.get<Kit>('kits').query()
-    if(kits.length > 0){
-      // alert("it exists")
-    }else{
-       const kitData = [
-        {label: "Kit 1", montantTotal: 1000},
-        {label: "Kit 2", montantTotal: 2000},
-        {label: "Kit 3", montantTotal: 3000},
-        {label: "Kit 4", montantTotal: 4000},
-        {label: "Kit 5", montantTotal: 5000},
-       ]
-
-       for (const kit of kitData) {
-        await createKit(kit)
-      }
-    }
-}
-
- const clearAllDatabase = async () => {
-  await database.write(async () => {
-    const allCollections = database.collections.map;
-    
-    for (const [tableName, collection] of Object.entries(allCollections)) {
-      const allRecords = await collection.query().fetch();
-      await database.batch(
-        ...allRecords.map(record => record.prepareDestroyPermanently())
-      );
-    }
-  });
+  versements?: Versement[];
+  souscriptions?: Souscription[];
+  kits?: Kit[];
+  saisons?: Saison[];
 };
 
-async function createKit(data:{label: string, montantTotal: number}) {
+const Page = ({ versements, souscriptions, kits, saisons }: Props) => {
+  const { colors, spacing, typography, radius, elevation } = useAppTheme();
 
-  try {
-    return database.write(async () => {
-    const client = await database.get<Kit>('kits').create((kit) => {
-         kit.label = data.label
-         kit.saisonId = "1"
-         kit.montantTotal = data.montantTotal
-         
-   })
-   
+  const totalAmount = versements?.reduce((acc, cur) => acc + cur.montant, 0);
+  const activeSaison = saisons?.find((s) => s.active) || saisons?.[0];
 
-  //  console.log("=============", client)
+  const { logout, agent } = agentStore();
 
-   return client
-   })
-    
-  } catch (error) {
-     console.log(error);
-  }
- 
-}
-  
+  const agentFirstName =
+    agent?.data?.agent?.firstName || agent?.agent?.firstName || '';
+
+  useEffect(() => {
+    syncWithBackend();
+  }, []);
+
   return (
-    <ScreenWrapper>
-       <ScrollView
-       
-       showsVerticalScrollIndicator={false}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        {/* ── HEADER ──────────────────────────────────────── */}
+        <View
+          style={{
+            paddingHorizontal: spacing.xl,
+            paddingTop: spacing.md,
+            paddingBottom: spacing.sm,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+            }}
+          >
+            <View style={{ flex: 1, gap: spacing.xs }}>
+              <Text
+                style={[typography.headlineLarge, { color: colors.onSurface }]}
+                numberOfLines={1}
+              >
+                Bonjour, {agentFirstName}
+              </Text>
+              {activeSaison && (
+                <AppBadge
+                  label={activeSaison.label || 'Aucune saison'}
+                  variant="label"
+                  color="primary"
+                  size="sm"
+                />
+              )}
+            </View>
 
-      <ThemedText style={{fontWeight: "500", fontSize: SIZES.sm, marginBottom: Rs(20), color: colors.dashitem.t_1}}>
-        Saison 2
-      </ThemedText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <SyncButton />
+              <Pressable
+                onPress={logout}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                style={{ padding: spacing.sm }}
+              >
+                <Feather name="log-out" size={22} color={colors.error} />
+              </Pressable>
+            </View>
+          </View>
+        </View>
 
-      {/* <Button 
-      title='Ajouter un kit'
-      onPress={() => {
-        // logout()
-        // syncWithBackend()
-        createKit()
-      }}
-      /> */}
-     
-      <DashCard
-      label='Versements du jour'
-      value={formatXOF(totalAmount || 0)}
-      border={colors.dashitem.t_3}
-      icon={<FontAwesome6 name="money-bills" size={16} color={colors.dashitem.t_3} />}
-      action={() => console.log('action')}
-      />
+        {/* ── CONTENT (fills space between header and tab bar) ── */}
+        <View
+          style={{
+            flex: 1,
+            paddingHorizontal: spacing.xl,
+            paddingBottom: 70 + spacing.xl,
+            gap: spacing.md,
+          }}
+        >
+          {/* ── Summary Card ── */}
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              borderRadius: radius.lg,
+              ...elevation.sm,
+              overflow: 'hidden',
+            }}
+          >
+            {/* Main stat */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.md,
+                padding: spacing.md,
+              }}
+            >
+              <View
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: radius.md,
+                  backgroundColor: colors.primaryContainer,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <Ionicons name="wallet" size={20} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[typography.caption, { color: colors.onSurfaceVariant }]}>
+                  Versements du jour
+                </Text>
+                <Text style={[typography.headlineMedium, { color: colors.onSurface }]}>
+                  {formatXOF(totalAmount || 0)}
+                </Text>
+              </View>
+            </View>
 
-      <View style={{flexDirection: "row", marginVertical: Rs(20), gap: 10}} >
+            {/* Divider */}
+            <View style={{ height: 1, backgroundColor: colors.outlineVariant, marginHorizontal: spacing.md }} />
 
-            <DashCard
-              label='Souscriptions'
-              value={souscriptions?.length || 0}
-              border={colors.gloryColor.c_1}
-              icon={<FontAwesome5 name="box-open" size={16} color={colors.gloryColor.c_1} />}
-              action={() => console.log('action')}
-              />
-             <DashCard
-              label='Kits'
-              value={kits?.length || 0}
-              border={colors.dashitem.t_1}
-              icon={<FontAwesome5 name="boxes" size={16} color={colors.dashitem.t_1} />}
-              action={() => console.log('action')}
-              />
+            {/* Stats row */}
+            <View
+              style={{
+                flexDirection: 'row',
+                paddingVertical: spacing.sm,
+                paddingHorizontal: spacing.md,
+              }}
+            >
+              <View style={{ flex: 1, alignItems: 'center' }}>
+                <Text style={[typography.titleLarge, { color: colors.primary }]}>
+                  {souscriptions?.length || 0}
+                </Text>
+                <Text style={[typography.caption, { color: colors.onSurfaceVariant }]}>
+                  Souscriptions
+                </Text>
+              </View>
+              <View style={{ width: 1, backgroundColor: colors.outlineVariant, marginVertical: spacing.xxs }} />
+              <View style={{ flex: 1, alignItems: 'center' }}>
+                <Text style={[typography.titleLarge, { color: colors.success }]}>
+                  {kits?.length || 0}
+                </Text>
+                <Text style={[typography.caption, { color: colors.onSurfaceVariant }]}>
+                  Kits
+                </Text>
+              </View>
+              <View style={{ width: 1, backgroundColor: colors.outlineVariant, marginVertical: spacing.xxs }} />
+              <View style={{ flex: 1, alignItems: 'center' }}>
+                <Text style={[typography.titleLarge, { color: colors.warning }]}>
+                  {versements?.length || 0}
+                </Text>
+                <Text style={[typography.caption, { color: colors.onSurfaceVariant }]}>
+                  Versements
+                </Text>
+              </View>
+            </View>
+          </View>
 
-             
-      </View>
-
-      <View style={{gap: Rs(20)}} >
-
-        <EnhancedLastedClients /> 
-
-        <EnhancedLastedPayments /> 
-      </View>
-
-      
-    </ScrollView>
-
-    </ScreenWrapper>
-  )
-}
+          {/* ── Recent activity (fills remaining space) ── */}
+          <View style={{ flex: 1, gap: spacing.md }}>
+            <EnhancedLastedClients />
+            <EnhancedLastedPayments />
+          </View>
+        </View>
+      </SafeAreaView>
+    </View>
+  );
+};
 
 const enhance = withObservables([], () => ({
-  versements: database.get<Versement>('versements').query().observeWithColumns(['amount']),
-  souscriptions: database.get<Souscription>('souscriptions').query().observeWithColumns(['kit_id']),
+  versements: database
+    .get<Versement>('versements')
+    .query()
+    .observeWithColumns(['amount']),
+  souscriptions: database
+    .get<Souscription>('souscriptions')
+    .query()
+    .observeWithColumns(['kit_id']),
   kits: database.get<Kit>('kits').query().observeWithColumns(['label']),
-  
-}))
-const EnhancedPage = enhance(Page)
+  saisons: database.get<Saison>('saisons').query().observe(),
+}));
 
-export default EnhancedPage
+const EnhancedPage = enhance(Page);
+
+export default EnhancedPage;

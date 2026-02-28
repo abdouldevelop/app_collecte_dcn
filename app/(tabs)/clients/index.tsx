@@ -1,354 +1,329 @@
-import { ScrollView, StyleSheet, Text, View, Pressable, Animated } from 'react-native'
-import React, { useRef, useState } from 'react'
-import ScreenWrapper from '@/components/ScreenWrapper'
-import SearchInput from '@/components/SearchInput'
-import { ThemedText } from '@/components/ThemedText'
-import { colors, Rs, SIZES } from '@/shared/utils'
-import FlatBtn from '@/components/FlatBtn'
-import ParallaxScrollView from '@/components/ParallaxScrollView'
-import ClientItem from '@/features/dashboard/client/clients-item'
-import { Link } from 'expo-router'
-import BottomSheetCompoForm from '@/components/BottomSheetCompoForm'
-import CustomInput from '@/components/form/CustomInput'
-import { Feather } from '@expo/vector-icons'
-import { BottomSheetModal } from '@gorhom/bottom-sheet'
-import AddClient from '@/features/dashboard/client/add-client'
-import EnhancedClientItem from '@/features/dashboard/client/clients-item'
-import { useClients } from '@/hooks/app/useClient'
-import { database } from '@/database/database'
-import Client from '@/database/model/Client'
-import Kit from '@/database/model/Kit'
-import { withObservables } from '@nozbe/watermelondb/react'
-import { useSouscription } from '@/hooks/app/useSubscription'
-import BottomSheetCompo from '@/components/BottomSheetCompo'
-import BackButton from '@/components/BackButton'
-import { Q } from '@nozbe/watermelondb'
-import SubscriptionEmptyPay from '@/features/subscription/subscription-empty-pay'
-import Souscription from '@/database/model/Souscription'
-import EnhancedClientKitItem from '@/features/dashboard/client/clients-kit-item'
+import { ScrollView, Text, View, Pressable } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { Feather } from '@expo/vector-icons';
+import { BottomSheetModal } from '@gorhom/bottom-sheet';
+import Animated, {
+  FadeIn,
+  FadeInRight,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { withObservables } from '@nozbe/watermelondb/react';
+import { Q } from '@nozbe/watermelondb';
+
+import { useAppTheme } from '@/theme';
+import { AppSearchBar, AppBadge, AppEmptyState, AppBottomSheet } from '@/components/ui';
+import { database } from '@/database/database';
+import Client from '@/database/model/Client';
+import Kit from '@/database/model/Kit';
+import Souscription from '@/database/model/Souscription';
+import EnhancedClientKitItem from '@/features/dashboard/client/clients-kit-item';
+import AddClient from '@/features/dashboard/client/add-client';
+
+// ============================================================
+// TYPES
+// ============================================================
 
 type Props = {
-  clients?: Client[]
-  subscriptions?: Souscription[]
-  kits?: Kit[]
+  clients?: Client[];
+  subscriptions?: Souscription[];
+  kits?: Kit[];
+};
+
+// ============================================================
+// KIT CHIP
+// ============================================================
+
+type KitChipProps = {
+  kit: Kit;
+  isSelected: boolean;
+  count: number;
+  onPress: () => void;
+};
+
+function KitChip({ kit, isSelected, count, onPress }: KitChipProps) {
+  const { colors, spacing, radius, typography } = useAppTheme();
+
+  return (
+    <Pressable onPress={onPress}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.xs,
+          paddingVertical: spacing.sm,
+          paddingHorizontal: spacing.md,
+          borderRadius: radius.full,
+          borderWidth: 1,
+          borderColor: isSelected ? colors.primary : colors.outlineVariant,
+          backgroundColor: isSelected ? colors.primaryContainer : colors.surface,
+        }}
+      >
+        <Text
+          style={[
+            typography.labelMedium,
+            {
+              color: isSelected ? colors.onPrimaryContainer : colors.onSurfaceVariant,
+            },
+          ]}
+          numberOfLines={1}
+        >
+          {kit.label}
+        </Text>
+        <AppBadge
+          label={count}
+          variant="count"
+          color={isSelected ? 'primary' : 'neutral'}
+          size="sm"
+        />
+      </View>
+    </Pressable>
+  );
 }
 
-const Page = ({clients, subscriptions, kits}: Props) => {
+// ============================================================
+// PAGE COMPONENT
+// ============================================================
+
+const Page = ({ clients, subscriptions, kits }: Props) => {
+  const { colors, spacing, radius, elevation, typography } = useAppTheme();
+  const insets = useSafeAreaInsets();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedKitId, setSelectedKitId] = useState<string | null>(null);
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
-  const scrollY = useRef(new Animated.Value(0)).current;
 
-  // console.log("9999999999999999999999999999999", subscriptions)
+  // --- Filter clients based on search query → get matching IDs ---
+  const matchingClientIds = searchQuery.trim()
+    ? new Set(
+        clients
+          ?.filter(
+            (client) =>
+              client.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              client.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              client.phone?.includes(searchQuery),
+          )
+          .map((c) => c.id),
+      )
+    : null;
 
-  // Filter subscriptions based on selected kit
-  const filteredSubscriptions = selectedKitId 
-    ? subscriptions?.filter(sub => sub.kitId === selectedKitId)
-    : subscriptions;
+  // --- Filter subscriptions based on selected kit + search query ---
+  const filteredSubscriptions = subscriptions?.filter((sub) => {
+    const matchesKit = selectedKitId ? sub.kitId === selectedKitId : true;
+    const matchesSearch = matchingClientIds ? matchingClientIds.has(sub.clientId) : true;
+    return matchesKit && matchesSearch;
+  });
 
-  const filteredClients = clients?.filter(client =>
-    client.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    client.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    client.phone?.includes(searchQuery)
+  // --- Get subscription count per kit ---
+  const getKitSubscriptionCount = useCallback(
+    (kitId: string) => {
+      return subscriptions?.filter((sub) => sub.kitId === kitId).length || 0;
+    },
+    [subscriptions],
   );
 
-  const KitCard = ({ kit, isSelected, onPress }: { kit: Kit, isSelected: boolean, onPress: () => void }) => {
-    const subscriptionsCount = subscriptions?.filter(sub => sub.kitId === kit.id).length || 0;
-    
-    return (
-      <Pressable
-        onPress={onPress}
-        style={[
-          styles.kitCard,
-          isSelected && styles.selectedKitCard
-        ]}
-        // android_ripple={{ color: colors.gloryColor.c_1 + '20' }}
-      >
-        <View style={[styles.kitIconContainer, { backgroundColor: !isSelected ? colors.gloryColor.c_1 : 'white' }]}>
-          {/* <Feather 
-            name="package" 
-            size={16} 
-            color={isSelected ? 'white' : colors.gloryColor.c_1} 
-          /> */}
-          <Text style={{fontSize: SIZES.xs, color: !isSelected ? 'white' : 'black'}} >{subscriptionsCount}</Text>
-        </View>
-        
-        <ThemedText style={[
-          styles.kitTitle,
-          isSelected && styles.selectedKitTitle
-        ]} numberOfLines={2}>
-          {kit.label}
-        </ThemedText>
+  // --- Toggle kit filter ---
+  const handleKitPress = useCallback(
+    (kitId: string) => {
+      setSelectedKitId((current) => (current === kitId ? null : kitId));
+    },
+    [],
+  );
 
-       
-      </Pressable>
-    );
-  };
+  // --- Open add client bottom sheet ---
+  const handleOpenAddClient = useCallback(() => {
+    bottomSheetModalRef.current?.present();
+  }, []);
+
+  // --- Close add client bottom sheet ---
+  const handleCloseAddClient = useCallback(() => {
+    bottomSheetModalRef.current?.close();
+  }, []);
 
   return (
-    <>
-    <ScreenWrapper>
-      {/* <SearchInput 
-        placeholder="Rechercher un client" 
-        searchQuery={searchQuery} 
-        setSearchQuery={setSearchQuery} 
-      /> */}
-      
-   
-      <FlatBtn action={() => bottomSheetModalRef.current?.present()} />
-
-      {/* Kit Selection Header */}
-      <View style={styles.kitSelectionContainer}>
-        <View style={styles.kitHeaderRow}>
-          <ThemedText style={styles.sectionTitle}>
-            Sélectionner un Kit
-          </ThemedText>
-          {selectedKitId && (
-            <Pressable 
-              onPress={() => setSelectedKitId(null)}
-              style={styles.clearButton}
-            >
-              <Text style={styles.clearButtonText}>Tout afficher</Text>
-              <Feather name="x" size={16} color={colors.gloryColor.c_1} />
-            </Pressable>
-          )}
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        {/* ── Title ─────────────────────────────────────────── */}
+        <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.sm }}>
+          <Text style={[typography.headlineLarge, { color: colors.onSurface }]}>
+            Clients
+          </Text>
+          <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, marginTop: spacing.xxs }]}>
+            {subscriptions?.length || 0} souscription{(subscriptions?.length || 0) > 1 ? 's' : ''}
+          </Text>
         </View>
 
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.kitsScrollContainer}
-          style={styles.kitsScrollView}
+        {/* ── Search ────────────────────────────────────────── */}
+        <View style={{ paddingHorizontal: spacing.xl, marginBottom: spacing.sm }}>
+          <AppSearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Rechercher un client..."
+          />
+        </View>
+
+        {/* ── Kit Filter Chips (fixed, not scrolling vertically) ── */}
+        <View style={{ marginBottom: spacing.sm }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: spacing.sm, paddingHorizontal: spacing.xl }}
+          >
+            {/* "Tous" chip */}
+            <Pressable onPress={() => setSelectedKitId(null)}>
+              <View
+                style={{
+                  paddingVertical: spacing.sm,
+                  paddingHorizontal: spacing.md,
+                  borderRadius: radius.full,
+                  borderWidth: 1,
+                  borderColor: !selectedKitId ? colors.primary : colors.outlineVariant,
+                  backgroundColor: !selectedKitId ? colors.primaryContainer : colors.surface,
+                }}
+              >
+                <Text
+                  style={[
+                    typography.labelMedium,
+                    { color: !selectedKitId ? colors.onPrimaryContainer : colors.onSurfaceVariant },
+                  ]}
+                >
+                  Tous ({subscriptions?.length || 0})
+                </Text>
+              </View>
+            </Pressable>
+
+            {kits?.map((kit) => (
+              <KitChip
+                key={kit.id}
+                kit={kit}
+                isSelected={selectedKitId === kit.id}
+                count={getKitSubscriptionCount(kit.id)}
+                onPress={() => handleKitPress(kit.id)}
+              />
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* ── Client List ──────────────────────────────────── */}
+        <ScrollView
+          style={{ flex: 1 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{
+            gap: spacing.sm,
+            paddingHorizontal: spacing.xl,
+            paddingBottom: 70 + insets.bottom + spacing.xl,
+          }}
         >
-          {kits?.map((kit) => (
-            <KitCard
-              key={kit.id}
-              kit={kit}
-              isSelected={selectedKitId === kit.id}
-              onPress={() => setSelectedKitId(selectedKitId === kit.id ? null : kit.id)}
-            />
+          {filteredSubscriptions?.map((item, index) => (
+            <Animated.View
+              key={item?.id}
+              entering={FadeInRight.delay(Math.min(index, 10) * 40)
+                .springify()
+                .damping(18)}
+            >
+              <EnhancedClientKitItem subs={item} />
+            </Animated.View>
           ))}
+
+          {/* Empty State: search with no results */}
+          {filteredSubscriptions?.length === 0 && searchQuery.trim() && (
+            <AppEmptyState
+              icon="search"
+              title="Aucun resultat"
+              description={`Aucun client trouve pour "${searchQuery}".`}
+            />
+          )}
+
+          {/* Empty State: filter active, no results */}
+          {filteredSubscriptions?.length === 0 && selectedKitId && !searchQuery.trim() && (
+            <AppEmptyState
+              icon="package"
+              title="Aucune souscription"
+              description="Aucune souscription trouvee pour ce kit."
+            />
+          )}
+
+          {/* Empty State: no subscriptions at all */}
+          {subscriptions?.length === 0 && !selectedKitId && !searchQuery.trim() && (
+            <AppEmptyState
+              icon="users"
+              title="Aucun client"
+              description="Ajoutez votre premier client."
+              actionLabel="Ajouter un client"
+              onAction={handleOpenAddClient}
+            />
+          )}
         </ScrollView>
-      </View>
+      </SafeAreaView>
 
-      {/* Subscriptions List */}
-      <View style={styles.subscriptionsHeader}>
-        {/* <ThemedText style={styles.sectionTitle}>
-          {selectedKitId 
-            ? `Souscriptions (${filteredSubscriptions?.length || 0})`
-            : `Toutes les souscriptions (${subscriptions?.length || 0})`
-          }
-        </ThemedText> */}
-        
-        {/* {selectedKitId && (
-          <View style={styles.filterChip}>
-            <Feather name="filter" size={14} color={colors.gloryColor.c_1} />
-            <Text style={styles.filterChipText}>Filtré</Text>
-          </View>
-        )} */}
-      </View>
-
-      <Animated.ScrollView 
-        style={styles.subscriptionsScrollView}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false }
-        )}
-        scrollEventThrottle={16}
-        snapToAlignment="start"
-        decelerationRate="fast"
-        bounces={false}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.subscriptionsContainer}
-        showsVerticalScrollIndicator={false}
+      {/* ── FAB ──────────────────────────────────────────────── */}
+      <Animated.View
+        entering={FadeIn.springify().damping(14)}
+        style={{
+          position: 'absolute',
+          bottom: 70 + insets.bottom + spacing.lg,
+          right: spacing.xl,
+        }}
       >
-        {filteredSubscriptions?.map((item) => (
-          <EnhancedClientKitItem key={item?.id} subs={item} />
-        ))}
-           
-        {filteredSubscriptions?.length === 0 && selectedKitId && (
-          <SubscriptionEmptyPay 
-            title='Aucune souscription pour ce kit' 
-            icon='📦'
-          />
-        )}
+        <Pressable
+          onPress={handleOpenAddClient}
+          style={({ pressed }) => [
+            {
+              width: 56,
+              height: 56,
+              borderRadius: radius.full,
+              backgroundColor: colors.primary,
+              alignItems: 'center',
+              justifyContent: 'center',
+              ...elevation.lg,
+              transform: [{ scale: pressed ? 0.94 : 1 }],
+            },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Ajouter un client"
+        >
+          <Feather name="plus" size={24} color={colors.onPrimary} />
+        </Pressable>
+      </Animated.View>
 
-        {subscriptions?.length === 0 && !selectedKitId && (
-          <SubscriptionEmptyPay 
-            title="Aucun client n'a souscrit "
-            icon='👤'
-          />
-        )}
-      </Animated.ScrollView>
-     
-    </ScreenWrapper>
+      {/* ── Bottom Sheet: Add Client ──────────────────────── */}
+      <AppBottomSheet
+        ref={bottomSheetModalRef}
+        snapPoints={['90%']}
+        title="Nouveau client"
+        onDismiss={() => {}}
+      >
+        <AddClient closeModal={handleCloseAddClient} />
+      </AppBottomSheet>
+    </View>
+  );
+};
 
-    <BottomSheetCompo bottomSheetModalRef={bottomSheetModalRef} snapPoints={["90%"]}>
-      <View style={styles.bottomSheetHeader}>
-        <BackButton
-          backAction={() => bottomSheetModalRef.current?.close()}
-          icon={<Feather size={Rs(18)} name="x" color={colors.red} />}
-        />
-      </View>
-      <AddClient closeModal={() => bottomSheetModalRef.current?.close()} />
-    </BottomSheetCompo>
-    </>
-  )
-}
+// ============================================================
+// WATERMELONDB OBSERVABLES
+// ============================================================
 
-const enhance = withObservables([], () =>({
-  clients: database.get('clients')
-    .query(
-      Q.sortBy('created_at', Q.desc),
-    )
-    .observeWithColumns(['firstName', 'lastName', 'phone']),
+const enhance = withObservables([], () => ({
+  clients: database
+    .get<Client>('clients')
+    .query(Q.sortBy('created_at', Q.desc))
+    .observeWithColumns(['first_name', 'last_name', 'phone']),
 
   subscriptions: database.collections
     .get<Souscription>('souscriptions')
-    .query(
-      Q.sortBy('created_at', Q.desc)
-    )
-    .observe(),
+    .query(Q.sortBy('created_at', Q.desc))
+    .observeWithColumns(['kit_id', 'client_id', 'statut']),
 
   kits: database.collections
     .get<Kit>('kits')
-    .query(
-      Q.sortBy('label', Q.asc)
-    )
-    .observe()
-}))
+    .query(Q.sortBy('label', Q.asc))
+    .observeWithColumns(['label']),
+}));
 
-const EnhancedPage = enhance(Page)
+const EnhancedPage = enhance(Page);
 
-export default EnhancedPage
-
-const styles = StyleSheet.create({
-  kitSelectionContainer: {
-    marginVertical: Rs(10),
-  },
-  kitHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Rs(15),
-    // paddingHorizontal: Rs(16),
-  },
-  sectionTitle: {
-    fontSize: SIZES.lg,
-    fontWeight: '700',
-    color: colors.titleColor,
-  },
-  clearButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Rs(5),
-    paddingHorizontal: Rs(12),
-    paddingVertical: Rs(6),
-    backgroundColor: `${colors.gloryColor.c_1}15`,
-    borderRadius: Rs(20),
-  },
-  clearButtonText: {
-    fontSize: SIZES.xs,
-    color: colors.gloryColor.c_1,
-    fontWeight: '600',
-  },
-  kitsScrollView: {
-    flexGrow: 0,
-  },
-  kitsScrollContainer: {
-    paddingHorizontal: Rs(2),
-    gap: Rs(12),
-  },
-  kitCard: {
-    backgroundColor: 'white',
-    borderRadius: Rs(16),
-    padding: Rs(6),
-    minWidth: Rs(120),
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Rs(6),
-    borderColor: colors.blackOpacity,
-    borderWidth: StyleSheet.hairlineWidth,
-    position: 'relative',
-  },
-  selectedKitCard: {
-    backgroundColor: colors.gloryColor.c_1,
-    borderColor: colors.gloryColor.c_1,
-    transform: [{ scale: 1.05 }],
-  },
-  kitIconContainer: {
-    width: Rs(35),
-    height: Rs(35),
-    backgroundColor: `${colors.gloryColor.c_1}15`,
-    borderRadius: Rs(24),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  kitTitle: {
-    fontSize: SIZES.xs,
-    fontWeight: '600',
-    color: colors.titleColor,
-    textAlign: 'center',
-  },
-  selectedKitTitle: {
-    color: 'white',
-  },
-  countBadge: {
-    backgroundColor: colors.gloryColor.c_1,
-    minWidth: Rs(28),
-    height: Rs(28),
-    borderRadius: Rs(14),
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Rs(8),
-    position: 'absolute',
-    top: Rs(-8),
-    right: Rs(-8),
-  },
-  selectedCountBadge: {
-    backgroundColor: 'white',
-  },
-  countText: {
-    color: 'white',
-    fontSize: SIZES.sm,
-    fontWeight: '700',
-  },
-  selectedCountText: {
-    color: colors.gloryColor.c_1,
-  },
-  subscriptionsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Rs(16),
-    marginBottom: Rs(15),
-    // marginTop: Rs(15),
-  },
-  filterChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Rs(5),
-    backgroundColor: `${colors.gloryColor.c_1}15`,
-    paddingHorizontal: Rs(10),
-    paddingVertical: Rs(5),
-    borderRadius: Rs(15),
-  },
-  filterChipText: {
-    fontSize: SIZES.xs,
-    color: colors.gloryColor.c_1,
-    fontWeight: '600',
-  },
-  subscriptionsScrollView: {
-    flex: 1,
-  },
-  subscriptionsContainer: {
-    gap: Rs(8),
-    paddingBottom: Rs(20),
-  },
-  bottomSheetHeader: {
-    position: "absolute", 
-    top: Rs(15), 
-    right: Rs(20), 
-    zIndex: 1,
-  },
-})
+export default EnhancedPage;

@@ -1,143 +1,150 @@
-import { StyleSheet, Text, View, ToastAndroid } from 'react-native'
-import React from 'react'
-
-import Toast from 'react-native-toast-message';
-
-import { Controller, useForm } from 'react-hook-form'
+import { View, Text, ToastAndroid, Platform, Alert, KeyboardAvoidingView, ScrollView } from 'react-native';
+import React from 'react';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-
-import ScreenWrapper from '@/components/ScreenWrapper'
-import CustomInput from '@/components/form/CustomInput'
-import { Feather } from '@expo/vector-icons'
-import { colors, Rs, SIZES } from '@/shared/utils'
-import GloringBtn from '@/components/form/GloringBtn'
-import { ClientSchemaData, newClentSchema } from '@/schema'
+import { FormInput, AppButton } from '@/components/ui';
+import { ClientSchemaData, newClientSchema } from '@/schema';
 import { database } from '@/database/database';
 import Client from '@/database/model/Client';
 import { agentStore } from '@/storage/MMKV';
-
+import { useAppTheme } from '@/theme';
 
 type Props = {
-  closeModal: () => void
-}
+  closeModal: () => void;
+};
 
-const AddClient = ({closeModal}: Props) => {
-const {agent} = agentStore();
-const {handleSubmit, control, reset, formState:{errors, isSubmitting}} = useForm<ClientSchemaData>({
-  resolver: zodResolver(newClentSchema), 
-  defaultValues:{
-    fullName: '',
-    address: '',
-    phone: ''
-  }
-})
+const AddClient = ({ closeModal }: Props) => {
+  const { colors, spacing, radius, typography } = useAppTheme();
+  const { agent } = agentStore();
+  const {
+    handleSubmit,
+    control,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<ClientSchemaData>({
+    resolver: zodResolver(newClientSchema),
+    defaultValues: {
+      firstName: '',
+      lastName: '',
+      phone: '',
+      address: '',
+    },
+  });
 
-async function onSubmit(data: ClientSchemaData) {
+  async function onSubmit(data: ClientSchemaData) {
+    try {
+      return database.write(async () => {
+        const client = await database.get<Client>('clients').create((newClient) => {
+          newClient.firstName = data.firstName.trim();
+          newClient.lastName = data.lastName.trim();
+          newClient.phone = data.phone.trim();
+          newClient.agentId = agent?.agent?.id;
+        });
 
-  try {
-    return database.write(async () => {
-      const client = await database.get<Client>('clients').create((newClient) => {
-        newClient.firstName = data.fullName
-        newClient.lastName = data.fullName
-        newClient.phone = data.phone,
-        newClient.agentId = agent?.agent?.id
-        // Don't set relation during creation
-      })
-      
-      if (client.id) {
-        reset()
-        closeModal()
-        ToastAndroid.showWithGravityAndOffset(
-        'Vous avez ajouté un client',
-        ToastAndroid.LONG,
-        ToastAndroid.BOTTOM,
-        25, // xOffset
-        50  // yOffset
-      );
+        if (client.id) {
+          reset();
+          closeModal();
+          if (Platform.OS === 'android') {
+            ToastAndroid.showWithGravityAndOffset(
+              'Client ajoute avec succes',
+              ToastAndroid.LONG,
+              ToastAndroid.BOTTOM,
+              25,
+              50,
+            );
+          }
+        }
+        return client;
+      });
+    } catch (error) {
+      console.log(error);
+      if (Platform.OS === 'android') {
+        ToastAndroid.show('Erreur lors de l\'ajout du client', ToastAndroid.SHORT);
+      } else {
+        Alert.alert('Erreur', 'Impossible d\'ajouter le client');
       }
-      return client
-    })
-    
-  } catch (error) {
-    console.log(error);
+    }
   }
-    
-}
 
   return (
-    <ScreenWrapper style={{backgroundColor: colors.white}}>
-      <Controller
-      name="fullName"
-      control={control}
-      render={({field:{onChange, onBlur, value}}) =>(
-        <CustomInput
-          label='Nom complet'
-          placeholder='Nom complet'
-          leftIcon={<Feather name='user' size={20} color={colors.gloryColor.c_1} />}
-          keyboardType='default'
-          onChangeText={(text) => onChange(text)}
-          onBlur={onBlur}
-          value={value}
-          error={errors.fullName?.message}
-        />
-
-      )}
-      />
-
-
-      <Controller
-      name='address'
-      control={control}
-      render={({field:{onChange, onBlur, value}}) =>(
-        <CustomInput
-        label='Adresse'
-        placeholder='Cocody, plateau dokui'
-        leftIcon={<Feather name='map-pin' size={20} color={colors.gloryColor.c_1} />}
-        keyboardType='default'
-        onChangeText={(text) => onChange(text)}
-        onBlur={onBlur}
-        value={value}
-        error={errors.address?.message}
-      />
-
-      )}
-      />
-      
-      <Controller
-      name="phone"
-      control={control}
-      render={({field:{onChange, onBlur, value}}) =>(
-        <CustomInput
-          label='Numéro de téléphone'
-          placeholder='Numéro de téléphone'
-          leftIcon={<Feather name='phone' size={20} color={colors.gloryColor.c_1} />}
-          keyboardType="numeric"
-          onChangeText={(text) => onChange(text)}
-          onBlur={onBlur}
-          value={value}
-          error={errors.phone?.message}
-        />
-
-      )}
-      
-      />
-
-      <View
-      style={{marginTop: Rs(20)}}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={{ flex: 1 }}
+    >
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{
+          padding: spacing.xl,
+          paddingBottom: spacing.xxxl,
+          gap: spacing.lg,
+        }}
       >
+        {/* Section: Identite */}
+        <View style={{ gap: spacing.xs }}>
+          <Text style={[typography.labelLarge, { color: colors.onSurfaceVariant, marginBottom: spacing.xs }]}>
+            Identite
+          </Text>
+          <View style={{ flexDirection: 'row', gap: spacing.md }}>
+            <View style={{ flex: 1 }}>
+              <FormInput
+                name="lastName"
+                control={control}
+                label="Nom"
+                placeholder="Kouassi"
+                leftIcon="user"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <FormInput
+                name="firstName"
+                control={control}
+                label="Prenom"
+                placeholder="Aya"
+              />
+            </View>
+          </View>
+        </View>
 
-        <GloringBtn
-          label='Ajouter'
-          action={handleSubmit(onSubmit)}
-          TStyle={{ fontSize: SIZES.mx }}
-          VStyle={{ height: Rs(50), paddingVertical: 0 }}
-        />
-      </View>
-              
-    </ScreenWrapper>
-  )
-}
+        {/* Section: Contact */}
+        <View style={{ gap: spacing.xs }}>
+          <Text style={[typography.labelLarge, { color: colors.onSurfaceVariant, marginBottom: spacing.xs }]}>
+            Contact
+          </Text>
+          <FormInput
+            name="phone"
+            control={control}
+            label="Telephone"
+            placeholder="0701020304"
+            leftIcon="phone"
+            keyboardType="phone-pad"
+          />
+          <FormInput
+            name="address"
+            control={control}
+            label="Adresse (optionnel)"
+            placeholder="Cocody, Plateau Dokui"
+            leftIcon="map-pin"
+            helperText="Quartier, commune ou ville"
+          />
+        </View>
 
-export default AddClient
+        {/* Submit */}
+        <View style={{ marginTop: spacing.sm }}>
+          <AppButton
+            label="Ajouter le client"
+            variant="filled"
+            gradient
+            fullWidth
+            size="lg"
+            loading={isSubmitting}
+            onPress={handleSubmit(onSubmit)}
+            leftIcon="user-plus"
+          />
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+};
 
-const styles = StyleSheet.create({})
+export default AddClient;

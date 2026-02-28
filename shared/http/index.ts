@@ -1,5 +1,7 @@
 // src/lib/api.ts
 import ky, { Options, TimeoutError, HTTPError } from "ky";
+import { getStorageItem, removeStorageItem } from "@/storage/MMKV";
+import { agentStore } from "@/storage/MMKV";
 
 const apiUrl = process.env.EXPO_PUBLIC_BASE_URL;
 
@@ -12,9 +14,8 @@ const api = ky.create({
   hooks: {
     beforeRequest: [
       async (request) => {
-        console.log("cccccccccc", apiUrl)
-        // Attach token from storage if needed
-        const token = ""; // TODO: load from SecureStore/AsyncStorage
+        const user = getStorageItem("USER");
+        const token = user?.data?.token;
         if (token) {
           request.headers.set("Authorization", `Bearer ${token}`);
         }
@@ -22,6 +23,13 @@ const api = ky.create({
     ],
    afterResponse: [
   async (request, options, response) => {
+    // Si le serveur répond 401, le token a expiré → déconnexion
+    if (response.status === 401 && !request.url.includes('agents/login')) {
+      removeStorageItem("USER");
+      agentStore.getState().logout();
+      return response;
+    }
+
     if (!response.ok) {
       let errorBody: any = null;
       try {
@@ -41,8 +49,6 @@ const api = ky.create({
     return response;
   },
    ],
-
-   
   },
 });
 

@@ -44,8 +44,10 @@
     },
     "extra": {
       "eas": {
-        "projectId": "0004606f-3410-4172-857a-e6a1e6ff969f"
-      }
-    }
+        "projectId": "47992af4-95f2-4c2f-af57-53bebf496baa"
+      },
+      "router": {}
+    },
+    "owner": "abdoulcodeur225"
   }
 }

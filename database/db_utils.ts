@@ -94,11 +94,18 @@ export const createTestData = async () => {
   }
 };
 
+let isSyncInProgress = false;
+
 export const syncWithBackend = async (
   options: SyncOptions = {}
 ): Promise<SyncResult> => {
+  if (isSyncInProgress) {
+    console.log("⏳ Sync déjà en cours, appel ignoré");
+    return { success: true, syncPhase: "skipped" };
+  }
+  isSyncInProgress = true;
   let currentPhase = "starting";
-  
+
   try {
     console.log("🔄 Starting database sync...");
     
@@ -130,15 +137,15 @@ export const syncWithBackend = async (
         });
 
         try {
-          const data = await http.post<{
-            changes: Record<string, any>;
-            timestamp: number;
-          }>('sync/pull', {
+          const response = await http.post<any>('sync/pull', {
             lastPulledAt,
             schemaVersion,
             migration,
           });
 
+          console.log("📥 PULL RAW RESPONSE:", JSON.stringify(response));
+
+          const data = response?.data || response;
           const { changes, timestamp } = data;
           
           pullCount = Object.values(changes).reduce((total, tableChanges: any) => {
@@ -237,16 +244,18 @@ export const syncWithBackend = async (
     const postSyncChanges = await checkLocalChanges();
     console.log(`📊 Post-sync: ${postSyncChanges.totalDirty} dirty records remaining`);
 
-    return { 
-      success: true, 
-      pullCount, 
+    isSyncInProgress = false;
+    return {
+      success: true,
+      pullCount,
       pushCount,
       hasLocalChanges: localChangesCheck.hasChanges,
       syncPhase: currentPhase
     };
   } catch (error) {
+    isSyncInProgress = false;
     console.error(`❌ SYNC FAILED in phase: ${currentPhase}`, error);
-    
+
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown sync error",

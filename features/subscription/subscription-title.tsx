@@ -1,50 +1,29 @@
-import { StyleSheet, Text, View } from 'react-native'
-import React from 'react'
-import { Ionicons } from '@expo/vector-icons'
+import { View, Text } from 'react-native';
+import React from 'react';
+import { useAppTheme } from '@/theme';
 
 type Props = {
   icon: React.ReactNode;
   title: string;
   description: string;
-}
+};
 
 const SubscriptionTitle = ({ icon, title, description }: Props) => {
+  const { colors, spacing, typography } = useAppTheme();
+
   return (
-          <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            {icon}
-            <Text style={styles.sectionTitle}>{title}</Text>
-          </View>
-          <Text style={styles.sectionSubtitle}>{description}</Text>
-          
-        </View>
+    <View style={{ marginTop: spacing.xl }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
+        {icon}
+        <Text style={[typography.headlineMedium, { color: colors.onSurface, marginLeft: spacing.md }]}>
+          {title}
+        </Text>
+      </View>
+      <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginBottom: spacing.lg, marginLeft: spacing.xxxl }]}>
+        {description}
+      </Text>
+    </View>
+  );
+};
 
-
-  )
-}
-
-export default SubscriptionTitle
-
-const styles = StyleSheet.create({
-
-  section: {
-    marginTop: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginLeft: 12,
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    color: '#64748b',
-    marginBottom: 16,
-    marginLeft: 36,
-  }
-})
+export default SubscriptionTitle;

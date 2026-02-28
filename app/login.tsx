@@ -1,165 +1,210 @@
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, Image, ActivityIndicator, Keyboard, ToastAndroid } from 'react-native'
-import React, { useState } from 'react'
-import ScreenWrapper from '@/components/ScreenWrapper'
-import { colors, Rs, SCREEN_H, SIZES } from '@/shared/utils'
-import CustomInput from '@/components/form/CustomInput'
-import { Feather } from '@expo/vector-icons'
-import GloringBtn from '@/components/form/GloringBtn'
-import { Controller, useForm } from 'react-hook-form'
-import { loginSchema, LoginSchemaData } from '@/schema'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { http } from '@/shared/http'
-import { HTTPError } from 'ky'
-import { IAgent, IAuth, TError } from '@/interfaces'
-import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut } from 'react-native-reanimated'
-import { agentStore, setStorageItem } from '@/storage/MMKV'
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Keyboard,
+  ToastAndroid,
+  StyleSheet,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { HTTPError } from 'ky';
 
-type Props = {}
+import { useAppTheme } from '@/theme';
+import { FormInput, AppButton } from '@/components/ui';
+import { loginSchema, LoginSchemaData } from '@/schema';
+import { http } from '@/shared/http';
+import { IAuth, TError } from '@/interfaces';
+import { agentStore, setStorageItem } from '@/storage/MMKV';
+import { syncWithBackend } from '@/database/db_utils';
 
-const Page = (props: Props) => {
+const Page = () => {
+  const { colors, spacing, typography, radius } = useAppTheme();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-    const {login} = agentStore();
+  const { login } = agentStore();
 
-
-  const {handleSubmit, control, reset, formState:{errors, isSubmitting}} = useForm<LoginSchemaData>({
+  const {
+    handleSubmit,
+    control,
+    formState: { errors },
+  } = useForm<LoginSchemaData>({
     resolver: zodResolver(loginSchema),
-    defaultValues:{
+    defaultValues: {
       password: '',
-      phone: ''
-    }
-  })
+      phone: '',
+    },
+  });
 
   async function onSubmit(data: LoginSchemaData) {
     Keyboard.dismiss();
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      const response = await http.post('agents/login', data)
-      if(response){
-        console.log("resp===", response)
-        const agent  = response as IAuth;
-        setStorageItem("USER", response);
+      const response = await http.post('agents/login', data);
+      if (response) {
+        console.log('resp===', response);
+        const agent = response as IAuth;
+        await setStorageItem('USER', response);
         login(agent);
-        ToastAndroid.show("Connexion réussie", ToastAndroid.SHORT);
+        ToastAndroid.show('Connexion reussie — synchronisation...', ToastAndroid.SHORT);
+        // Sync immediate apres connexion
+        syncWithBackend().then((result) => {
+          if (result.success) {
+            ToastAndroid.show(
+              `Sync OK — ${result.pullCount || 0} recu(s), ${result.pushCount || 0} envoye(s)`,
+              ToastAndroid.SHORT,
+            );
+          } else {
+            ToastAndroid.show('Echec de la synchronisation', ToastAndroid.SHORT);
+          }
+        });
       }
-    } catch (error) {
-      console.log(error)
-      if(error instanceof HTTPError) {
-          const errorData: TError = await error.response.json().catch(() => ({
-          message: "Unexpected error",
-          statusCode: error.response.status,
+    } catch (err) {
+      console.log(err);
+      if (err instanceof HTTPError) {
+        const errorData: TError = await err.response.json().catch(() => ({
+          message: 'Unexpected error',
+          statusCode: err.response.status,
         }));
         setError(errorData.message);
         setTimeout(() => {
-          setError(null)
+          setError(null);
         }, 2000);
       }
-     
-    }finally{
-      setIsLoading(false)
+    } finally {
+      setIsLoading(false);
     }
   }
 
   return (
-    <ScreenWrapper style={{gap: Rs(40)}}>
-      
-       <Text style={{fontSize: SIZES.xl, fontWeight: 'bold', color: colors.gloryColor.c_1}}>
-        Connexion
-      </Text>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      {/* Subtle gradient background tint */}
+      <LinearGradient
+        colors={[
+          `${colors.gradient.primary[0]}14`,
+          `${colors.gradient.primary[1]}14`,
+          colors.background,
+        ]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
 
-        {/* <Image 
-        source={require('@/assets/app/login-img.png')}
-        style={{width: Rs(300), height: Rs(300), resizeMode: 'contain', alignSelf: "center"}}
-         /> */}
-       <KeyboardAvoidingView 
-        style={styles.keyboardAvoidingView}
+      <KeyboardAvoidingView
+        style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-        enabled={true}
       >
+        <ScrollView
+          style={styles.flex}
+          contentContainerStyle={[
+            styles.scrollContent,
+            {
+              paddingHorizontal: spacing.xl,
+              paddingTop: spacing.xxxxl,
+              paddingBottom: spacing.xxl,
+              gap: spacing.xl,
+            },
+          ]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          bounces={false}
+          keyboardDismissMode="interactive"
+        >
+          {/* Header section */}
+          <View style={{ gap: spacing.sm, marginBottom: spacing.lg }}>
+            <Animated.Text
+              entering={FadeInDown.delay(0).springify()}
+              style={[
+                typography.displayLarge,
+                { color: colors.onSurface },
+              ]}
+            >
+              Bienvenue
+            </Animated.Text>
+            <Animated.Text
+              entering={FadeInDown.delay(100).springify()}
+              style={[
+                typography.bodyLarge,
+                { color: colors.onSurfaceVariant },
+              ]}
+            >
+              Connectez-vous pour continuer
+            </Animated.Text>
+          </View>
 
-          <ScrollView
-            style={styles.scrollContainer}
-            contentContainerStyle={[
-              styles.scrollContent,
-              // isKeyboardVisible && { paddingBottom: keyboardHeight * 0.1 }
-            ]}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            enableOnAndroid={true}
-            scrollEnabled={true}
-            bounces={false}
-            keyboardDismissMode="interactive"
-          > 
+          {/* Form inputs */}
+          <View style={{ gap: spacing.sm }}>
+            <FormInput
+              control={control}
+              name="phone"
+              label="Telephone"
+              leftIcon="phone"
+              keyboardType="phone-pad"
+              placeholder="00 00 00 00 00"
+            />
 
-             <Controller
-             name="phone"
-             control={control}
-             render={({field:{onChange, onBlur, value}}) =>(
-               <CustomInput
-                 label='Téléphone'
-                 placeholder=' 00 00 00 00 00'
-                 leftIcon={<Feather name='phone' size={20} color={colors.gloryColor.c_1} />}
-                 keyboardType='phone-pad'
-                 contextMenuHidden={true}
-                 onChangeText={(text) => onChange(text)}
-                 onBlur={onBlur}
-                 value={value}
-                 error={errors.phone?.message}
-               />
-             )}
-             />
-            
-            <Controller
-            name="password"
-            control={control}
-            render={({field:{onChange, onBlur, value}}) =>(
-              <CustomInput
-                label='Mot de passe'
-                placeholder=' ********'
-                leftIcon={<Feather name='lock' size={20} color={colors.gloryColor.c_1} />}
-                keyboardType='default'
-                onChangeText={(text) => onChange(text)}
-                onBlur={onBlur}
-                value={value}
-                error={errors.password?.message}
-              />
-            )}
+            <FormInput
+              control={control}
+              name="password"
+              label="Mot de passe"
+              leftIcon="lock"
+              secureTextEntry
+              placeholder="********"
+            />
+          </View>
 
-             /> 
+          {/* Login button */}
+          <AppButton
+            label="Connexion"
+            variant="filled"
+            gradient
+            fullWidth
+            size="lg"
+            loading={isLoading}
+            disabled={isLoading}
+            onPress={handleSubmit(onSubmit)}
+          />
 
-              <GloringBtn
-               label='Connexion'
-               action={handleSubmit(onSubmit)}
-               isLoading={isLoading}
-              //  icon={<ActivityIndicator size={20} color={'white'} />}
-
-              />
-
-             {error && <Animated.Text style={{color: colors.red}}
+          {/* Error message */}
+          {error && (
+            <Animated.Text
               entering={FadeInDown.duration(400).springify().damping(12)}
               exiting={FadeOut.duration(300)}
-              > {error}</Animated.Text>}
+              style={[
+                typography.bodyMedium,
+                {
+                  color: colors.error,
+                  textAlign: 'center',
+                },
+              ]}
+            >
+              {error}
+            </Animated.Text>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+};
 
-          </ScrollView>
-         </KeyboardAvoidingView>
-    </ScreenWrapper>
-  )
-}
-
-export default Page
+export default Page;
 
 const styles = StyleSheet.create({
- keyboardAvoidingView: {
-    flex: 1
+  safeArea: {
+    flex: 1,
   },
-  scrollContainer: {
+  flex: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    minHeight: SCREEN_H * 0.6,
-    gap: Rs(20),
   },
-})
+});

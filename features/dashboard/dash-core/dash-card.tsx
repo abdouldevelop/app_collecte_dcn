@@ -1,66 +1,70 @@
-import { StyleSheet, Text, View } from 'react-native'
-import React from 'react'
-import { Feather } from '@expo/vector-icons'
-import { colors, Rs, SIZES } from '@/shared/utils'
+import React from 'react';
+import { View, Text } from 'react-native';
+import { AppCard } from '@/components/ui';
+import { useAppTheme } from '@/theme';
 
 type Props = {
- label: string
- value: string | number
- icon?: React.ReactNode
- action?: () => void
- border: string
-}
+  label: string;
+  value: string | number;
+  icon?: React.ReactNode;
+  action?: () => void;
+  border: string;
+};
 
-const DashCard = ({label, value,icon, border, action}: Props) => { 
+const DashCard = ({ label, value, icon, border, action }: Props) => {
+  const { colors, spacing, typography } = useAppTheme();
+
   return (
-    <View style={[styles.card, {borderLeftColor: border,}]}>
-     <View style={{flex: 1,  height: '100%', justifyContent: "center", gap: Rs(10)}}>
-      <Text style={styles.headerSubtitle}> {label} </Text>
-      <Text style={styles.headerTitle}> {value} </Text>
-     </View>
-     <View style={[styles.icon, {backgroundColor: `${border}20` }]}>
-      {icon}
-     </View>
-    </View>
-  )
-}
+    <AppCard
+      variant="elevated"
+      animated={true}
+      onPress={action}
+      style={{ flex: 1 }}
+      padding="lg"
+    >
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        {/* Left side: label + value */}
+        <View style={{ flex: 1, gap: spacing.sm }}>
+          <Text
+            style={[
+              typography.bodySmall,
+              { color: colors.onSurfaceVariant },
+            ]}
+          >
+            {label}
+          </Text>
+          <Text
+            style={[
+              typography.headlineMedium,
+              { color: colors.onSurface, fontWeight: '700' },
+            ]}
+          >
+            {value}
+          </Text>
+        </View>
 
-export default  DashCard
+        {/* Right side: icon in circle */}
+        <View
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: `${border}15`,
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          {icon}
+        </View>
+      </View>
+    </AppCard>
+  );
+};
 
-const styles = StyleSheet.create({
-  card: {
-   position: "relative",
-   backgroundColor: "white",
-    boxShadow: colors.boxShadow.sm,
-    padding: Rs(5),
-    borderLeftWidth: Rs(3),
-    
-    borderRadius: Rs(10),
-    flexDirection: "row",
-    maxHeight: Rs(100),
-    alignItems: "center",
-    flex: 1
-  },
-    headerTitle: {
-    fontSize: SIZES.sm,
-    fontWeight: 'bold',
-    color: colors.titleColor,
-  },
-  headerSubtitle: {
-    fontSize: SIZES.mx - 1,
-    color: colors.textColor,
-    marginTop: 4,
-    fontWeight: '600',
-  },
-  icon: {
-   position: "absolute",
-   top: Rs(5),
-   right: Rs(8),
-    width: Rs(30),
-    height: Rs(30),
-    justifyContent: "center",
-    alignItems: "center",
-    boxShadow: colors.boxShadow.sm,
-    borderRadius: Rs(20),
-  },
-});
+export default DashCard;

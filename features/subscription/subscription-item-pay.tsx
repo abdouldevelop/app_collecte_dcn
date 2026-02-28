@@ -1,26 +1,24 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from 'react';
 import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
+  Pressable,
   Alert,
-  ActivityIndicator,
   Keyboard,
   ToastAndroid,
-} from "react-native";
-import { Feather, Ionicons } from "@expo/vector-icons";
-import Souscription from "@/database/model/Souscription";
-import Versement from "@/database/model/versement";
-import { database } from "@/database/database";
-import { withObservables } from "@nozbe/watermelondb/react";
-import { Q } from "@nozbe/watermelondb";
-import Kit from "@/database/model/Kit";
-import { formatXOF, Rs, SIZES } from "@/shared/utils";
-import SubscriptionEmptyPay from "./subscription-empty-pay";
-import { agentStore } from "@/storage/MMKV";
+} from 'react-native';
+import { Feather, Ionicons } from '@expo/vector-icons';
+import Souscription from '@/database/model/Souscription';
+import Versement from '@/database/model/versement';
+import { database } from '@/database/database';
+import { withObservables } from '@nozbe/watermelondb/react';
+import { Q } from '@nozbe/watermelondb';
+import Kit from '@/database/model/Kit';
+import { formatXOF } from '@/shared/utils';
+import { agentStore } from '@/storage/MMKV';
+import { AppButton, AppEmptyState } from '@/components/ui';
+import { useAppTheme } from '@/theme';
 
 type Props = {
   subscription: Souscription;
@@ -28,398 +26,271 @@ type Props = {
   kit: Kit;
 };
 
-
-
 function SubscriptionItemPay({ kit, payments: pay, subscription: sub }: Props) {
-  console.log("SubscriptionItemPay props:", { pay });
+  const { colors, spacing, radius, typography } = useAppTheme();
 
-  
-  const [isShowHistoric, setIsShowHistoric] = useState(false);
-  const [newPayment, setNewPayment] = useState("");
-  const [showPayment, setSHowPayment] = useState(false);
-  const [isLoading, setisLoading] = useState(false);
-  
-  const {agent} = agentStore();
+  const [showHistory, setShowHistory] = useState(false);
+  const [newPayment, setNewPayment] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
+  const { agent } = agentStore();
 
-
-  const totalPaid = pay?.reduce((sum, p) => sum + p.montant, 0);
-
-  const getStatusColor = (status: string) => {
-    return status === "completed" ? "#4CAF50" : "#FF9800";
-  };
-
-  const getStatusIcon = (status: string) => {
-    return status === "completed" ? "checkmark-circle" : "time";
-  };
+  const totalPaid = pay?.reduce((sum, p) => sum + p.montant, 0) || 0;
+  const remaining = kit.montantTotal - totalPaid;
+  const progress = Math.min((totalPaid / (kit.montantTotal || 1)) * 100, 100);
+  const isCompleted = progress >= 100;
 
   async function handleAddPayment() {
-    
-   if(newPayment === "" || parseInt(newPayment) < 100 ){
-     return  Alert.alert(
-      "Montant invalide",
-      "Veuillez entrer un montant supérieur à 100 FCFA"
+    if (newPayment === '' || parseInt(newPayment) < 100) {
+      return Alert.alert(
+        'Montant invalide',
+        'Veuillez entrer un montant superieur a 100 FCFA'
+      );
+    }
 
-     );
-   }
-
-   if(totalPaid + parseInt(newPayment) > kit.montantTotal){
-     return Alert.alert(
-        "Montant invalide",
-        "Le montant total payé ne doit pas dépasser le montant total de la souscription",
-     );
-   }
+    if (totalPaid + parseInt(newPayment) > kit.montantTotal) {
+      return Alert.alert(
+        'Montant invalide',
+        'Le montant total paye ne doit pas depasser le montant total'
+      );
+    }
 
     Keyboard.dismiss();
-   
-
-    setisLoading(true);
-  try {
-    return await database.write(async () => {
-      const paid = await database.get<Versement>("versements").create((payment) => {
-        payment.souscriptionId = sub.id;
-        payment.agentId = agent?.agent?.id || '' ; // Make sure this agent exists
-        payment.montant = parseInt(newPayment);
-        payment.dateVersement = Date.now(); // Add the required date
-        payment.createdAt = Date.now(); // Add created timestamp
+    setIsLoading(true);
+    try {
+      return await database.write(async () => {
+        const paid = await database
+          .get<Versement>('versements')
+          .create((payment) => {
+            payment.souscriptionId = sub.id;
+            payment.agentId = agent?.agent?.id || '';
+            payment.montant = parseInt(newPayment);
+            payment.dateVersement = Date.now();
+            payment.createdAt = Date.now();
+          });
+        ToastAndroid.show('Paiement effectue', ToastAndroid.TOP);
+        return paid;
       });
-      ToastAndroid.show("Paiement éffectué", ToastAndroid.TOP);
-      return paid;
-    });
-  } catch (error) {
-    console.error("Error adding payment:", error);
-    console.error("Error details:", error?.message);
-    throw error; // Re-throw to handle upstream
-  }finally{
-    setisLoading(false);
-    setNewPayment("");
+    } catch (error) {
+      console.error('Error adding payment:', error);
+    } finally {
+      setIsLoading(false);
+      setNewPayment('');
+    }
   }
-}
-
 
   return (
-    <View style={styles.card}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          {totalPaid === kit.montantTotal && <Ionicons name="star" size={24} color="#6C63FF" />}
-          <Text style={styles.subscriptionName}>{kit.label} </Text>
-        </View>
-       
+    <View
+      style={{
+        backgroundColor: colors.surface,
+        borderRadius: radius.lg,
+        borderWidth: 1,
+        borderColor: colors.outlineVariant,
+        overflow: 'hidden',
+      }}
+    >
+      {/* ── Header: Kit name + status ── */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: spacing.lg,
+          paddingVertical: spacing.md,
+          gap: spacing.sm,
+        }}
+      >
+        {isCompleted && (
+          <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+        )}
+        <Text
+          style={[typography.titleMedium, { color: colors.onSurface, flex: 1 }]}
+          numberOfLines={1}
+        >
+          {kit.label}
+        </Text>
+        <Text
+          style={[
+            typography.labelMedium,
+            { color: isCompleted ? colors.success : colors.primary },
+          ]}
+        >
+          {isCompleted ? 'Termine' : `${Math.round(progress)}%`}
+        </Text>
       </View>
 
-      {/* Subscription Details */}
-      <View style={styles.detailsSection}>
-        <View style={styles.detailRow}>
-          <View style={styles.detailItem}>
-            <Ionicons
-              style={styles.detailItemIcon}
-              name="card"
-              size={Rs(20)}
-              color="#6C63FF"
-            />
-            <View style={styles.detailText}>
-              <Text style={styles.detailLabel}>Prix total</Text>
-              <Text style={styles.detailValue}>
-                {formatXOF(kit.montantTotal)} 
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.detailItem}>
-            <Ionicons style={styles.detailItemIcon} name="cash" size={Rs(20)} color="#4CAF50" />
-            <View style={styles.detailText}>
-              <Text style={styles.detailLabel}>Total payé</Text>
-              <Text style={styles.detailValue}>{formatXOF(totalPaid)}</Text>
-            </View>
-          </View>
-         
-        </View>
-
-        <View style={styles.detailRow}>
-           <View style={styles.detailItem}>
-            <Ionicons style={styles.detailItemIcon} name="wallet" size={Rs(20)} color="#FF6B6B" />
-            <View style={styles.detailText}>
-              <Text style={styles.detailLabel}>Reste à payer</Text>
-              <Text style={styles.detailValue}>
-                {formatXOF(kit.montantTotal - totalPaid)}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.detailItem}>
-            <Ionicons style={styles.detailItemIcon} name="calendar" size={Rs(20)} color="#FF9800" />
-            <View style={styles.detailText}>
-              <Text style={styles.detailLabel}>Dernier versement</Text>
-              <Text style={styles.detailValue}>
-                { pay?.length  && formatXOF(pay[pay?.length - 1]?.montant)}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </View>
-
-      {/* Payment Input */}
-     { totalPaid < kit.montantTotal && <View style={styles.inputSection}>
-        <Text style={styles.sectionTitle}>Ajouter un versement</Text>
-        <View style={styles.inputContainer}>
-          <View style={styles.inputWrapper}>
-            <Ionicons
-              name="card"
-              size={20}
-              color="#6C63FF"
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Entrez le montant"
-              placeholderTextColor="#999"
-              value={newPayment}
-              onChangeText={setNewPayment}
-              keyboardType="numeric"
-            />
-          </View>
-          <TouchableOpacity style={styles.addButton} onPress={handleAddPayment}>
-           {!isLoading ? 
-           <Ionicons name="add" size={20} color="white" /> :
-            <ActivityIndicator size="small" color="white" />
-          }
-          </TouchableOpacity>
-        </View>
-      </View>}
-
-      {/* Payment History */}
-      <View style={styles.paymentSection}>
+      {/* ── Progress bar ── */}
+      <View style={{ paddingHorizontal: spacing.lg }}>
         <View
           style={{
-            flex: 1,
-            justifyContent: "space-between",
-            flexDirection: "row",
-            alignItems: "center",
+            height: 6,
+            backgroundColor: colors.surfaceContainerHigh,
+            borderRadius: 3,
+            overflow: 'hidden',
           }}
         >
-          <Text style={styles.sectionTitle}>Historique de versement</Text>
-          <TouchableOpacity onPress={() => {
-            setIsShowHistoric(!isShowHistoric)
-            setSHowPayment(!showPayment)
-            }}>
-            <Feather name={isShowHistoric ? "eye" :"eye-off"} size={24} color="#6C63FF" />
-          </TouchableOpacity>
+          <View
+            style={{
+              height: '100%',
+              width: `${progress}%`,
+              backgroundColor: isCompleted ? colors.success : colors.primary,
+              borderRadius: 3,
+            }}
+          />
         </View>
-        {showPayment && (
-          <View style={styles.paymentList}>
-            {pay.length > 0 && pay?.map((payment) => (
-              <View key={payment.id} style={styles.paymentItem}>
-                <View style={styles.paymentLeft}>
-                  <Ionicons
-                    name={getStatusIcon('completed')}
-                    size={20}
-                    color={getStatusColor('completed')}
-                  />
-                  <View style={styles.paymentInfo}>
-                    <Text style={styles.paymentAmount}>
-                      {formatXOF(payment.montant)}
-                    </Text>
-                    <Text style={styles.paymentDate}>
-                      {new Date(payment.dateVersement).toLocaleDateString()} à
-                      {' '}
-                      {new Date(payment.dateVersement).toLocaleTimeString()}
-                      </Text>
-                  </View>
-                </View>
-               
-              </View>
-            ))}
-
-           {pay.length === 0 && <SubscriptionEmptyPay />}
-          </View>
-        )}
       </View>
+
+      {/* ── Montants: Paye / Reste ── */}
+      <View
+        style={{
+          flexDirection: 'row',
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing.md,
+        }}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={[typography.caption, { color: colors.onSurfaceVariant }]}>
+            Paye
+          </Text>
+          <Text style={[typography.labelLarge, { color: colors.success }]}>
+            {formatXOF(totalPaid)}
+          </Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[typography.caption, { color: colors.onSurfaceVariant }]}>
+            Reste
+          </Text>
+          <Text style={[typography.labelLarge, { color: remaining > 0 ? colors.error : colors.success }]}>
+            {formatXOF(remaining)}
+          </Text>
+        </View>
+        <View style={{ flex: 1, alignItems: 'flex-end' }}>
+          <Text style={[typography.caption, { color: colors.onSurfaceVariant }]}>
+            Total
+          </Text>
+          <Text style={[typography.labelLarge, { color: colors.onSurface }]}>
+            {formatXOF(kit.montantTotal)}
+          </Text>
+        </View>
+      </View>
+
+      {/* ── Payment Input (only if not completed) ── */}
+      {!isCompleted && (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.sm,
+            paddingHorizontal: spacing.lg,
+            paddingBottom: spacing.md,
+          }}
+        >
+          <TextInput
+            style={{
+              flex: 1,
+              height: 44,
+              backgroundColor: colors.surfaceVariant,
+              borderRadius: radius.md,
+              paddingHorizontal: spacing.md,
+              ...typography.bodyMedium,
+              color: colors.onSurface,
+            }}
+            placeholder="Montant..."
+            placeholderTextColor={colors.onSurfaceVariant}
+            value={newPayment}
+            onChangeText={setNewPayment}
+            keyboardType="numeric"
+          />
+          <AppButton
+            label=""
+            variant="filled"
+            size="sm"
+            onPress={handleAddPayment}
+            loading={isLoading}
+            leftIcon={isLoading ? undefined : 'plus'}
+            style={{ width: 44, height: 44, paddingHorizontal: 0 }}
+          />
+        </View>
+      )}
+
+      {/* ── History toggle ── */}
+      {pay.length > 0 && (
+        <Pressable
+          onPress={() => setShowHistory(!showHistory)}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingVertical: spacing.sm,
+            borderTopWidth: 1,
+            borderTopColor: colors.outlineVariant,
+            gap: spacing.xs,
+          }}
+        >
+          <Feather
+            name={showHistory ? 'chevron-up' : 'chevron-down'}
+            size={16}
+            color={colors.onSurfaceVariant}
+          />
+          <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant }]}>
+            Historique ({pay.length})
+          </Text>
+        </Pressable>
+      )}
+
+      {/* ── History list ── */}
+      {showHistory && pay.length > 0 && (
+        <View
+          style={{
+            borderTopWidth: 1,
+            borderTopColor: colors.outlineVariant,
+            paddingHorizontal: spacing.lg,
+            paddingVertical: spacing.sm,
+            gap: spacing.xs,
+          }}
+        >
+          {pay.map((payment) => (
+            <View
+              key={payment.id}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: spacing.xs,
+                gap: spacing.sm,
+              }}
+            >
+              <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+              <Text
+                style={[typography.labelMedium, { color: colors.onSurface, flex: 1 }]}
+              >
+                {formatXOF(payment.montant)}
+              </Text>
+              <Text style={[typography.caption, { color: colors.onSurfaceVariant }]}>
+                {new Date(payment.dateVersement).toLocaleDateString()}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
 
-
 const enhance = withObservables(
-  ["subscription"],
+  ['subscription'],
   ({ subscription }: { subscription: Souscription }) => ({
     subscription: subscription,
     payments: database.collections
-      .get<Versement>("versements")
+      .get<Versement>('versements')
       .query(
-        Q.where("souscription_id", subscription.id),
-        Q.sortBy("created_at", Q.desc) // Sort by creation date
+        Q.where('souscription_id', subscription.id),
+        Q.sortBy('created_at', Q.desc)
       )
       .observe(),
-
     kit: database.collections
-      .get<Kit>("kits")
+      .get<Kit>('kits')
       .findAndObserve(subscription.kitId),
   })
 );
 
 export default enhance(SubscriptionItemPay);
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F5F7FA",
-    padding: 16,
-  },
-  card: {
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 24,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E8E8E8",
-  },
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  subscriptionName: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#2D3436",
-    marginLeft: 8,
-  },
-  monthlyPrice: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#6C63FF",
-  },
-  detailsSection: {
-    marginBottom: 24,
-  },
-  detailRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 16,
-  },
-  detailItem: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F8F9FA",
-    padding: Rs(6),
-    borderRadius: 8,
-    marginHorizontal: 4,
-    height: Rs(100),
-  },
-  detailItemIcon: {
-     position: "absolute",
-     left: Rs(15),
-      top: Rs(10),
-      
-    },
-  detailText: {
-    marginLeft: 8,
-  },
-  detailLabel: {
-    fontSize: 11,
-    color: "#636E72",
-    marginBottom: 2,
-  },
-  detailValue: {
-    fontSize: SIZES.mx,
-    fontWeight: "600",
-    color: "#2D3436",
-  },
-  inputSection: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#2D3436",
-    marginBottom: 12,
-  },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  inputWrapper: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F8F9FA",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    marginRight: 8,
-  },
-  inputIcon: {
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    height: 48,
-    fontSize: 16,
-    color: "#2D3436",
-  },
-  addButton: {
-    backgroundColor: "#6C63FF",
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  paymentSection: {
-    marginBottom: 8,
-  },
-  paymentList: {
-    marginTop: 8,
-  },
-  paymentItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#F8F9FA",
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  paymentLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  paymentInfo: {
-    marginLeft: 12,
-  },
-  paymentAmount: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#2D3436",
-  },
-  paymentDate: {
-    fontSize: 12,
-    color: "#636E72",
-    marginTop: 2,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 10,
-    color: "white",
-    fontWeight: "600",
-    textTransform: "uppercase",
-  },
-});

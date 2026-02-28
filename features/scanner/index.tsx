@@ -24,11 +24,11 @@ import Animated, {
   withTiming
 } from 'react-native-reanimated';
 import SubscriptionCore from '../subscription';
-import BackButton from '@/components/BackButton';
-import { colors, Rs } from '@/shared/utils';
 import { Feather } from '@expo/vector-icons';
-import { useClients } from '@/hooks/app/useClient';
+import { useAppTheme } from '@/theme';
 import { database } from '@/database/database';
+import Client from '@/database/model/Client';
+import { Q } from '@nozbe/watermelondb';
 
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -48,6 +48,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
   title = "Scanner QR Code",
   subtitle = "Positionnez le code QR dans le cadre"
 }) => {
+  const { colors: themeColors, spacing } = useAppTheme();
   // All hooks must be called in the same order every time
   const [permission, requestPermission] = useCameraPermissions();
   const [isScanning, setIsScanning] = useState(true);
@@ -319,35 +320,38 @@ type Props = {
 };
 // Example usage component - This will be the default export
 const QRScannerCompo: React.FC<Props> = ({handleClose}) => {
+  const { colors: themeColors, spacing } = useAppTheme();
   const [showScanner, setShowScanner] = useState(true);
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
 
-  const {getClientById, loading, error,} = useClients(database);
-  
-
   const handleScanSuccess = useCallback( async(data: string) => {
-   const client = await getClientById(data);
-   if(!client){
-    router.push('/(tabs)/clients')
-    return Alert.alert('Client introuvable',
-          'Veuillez l\'enregistrer',
-        [
-         { text: 'Ok', onPress: () => {} }
-        ]
-        );
-   }else{
-     router.push(`/(tabs)/payment/${client.id}`);
+   // Le QR code contient le numéro de téléphone du client
+   const phone = data?.trim();
+
+   if(!phone){
+    return Alert.alert('QR Code invalide', 'Le QR code ne contient aucune donnée');
    }
-    // Alert.alert(
-    //   'QR Code Scanné',
-    //   // `Données: ${data}`,
-    //   "Votre QR Code a été scanné avec succès",
-    //   [
-    //     { text: 'Scanner à nouveau', onPress: () => setShowScanner(true) },
-    //     { text: 'Fermer', onPress: () => setShowScanner(false) }
-    //   ]
-    // );
-    // bottomSheetModalRef?.current?.present()
+
+   try {
+    const results = await database.get<Client>('clients')
+      .query(Q.where('phone', phone))
+      .fetch();
+
+    const client = results[0];
+
+    if(!client){
+      router.push('/(tabs)/clients');
+      return Alert.alert('Client introuvable',
+        `Aucun client avec le numéro "${phone}" dans votre base locale.\nVeuillez synchroniser ou l'enregistrer.`,
+        [{ text: 'Ok' }]
+      );
+    }
+
+    router.push(`/(tabs)/payment/${client.id}`);
+   } catch(err) {
+    console.error('Erreur recherche client:', err);
+    Alert.alert('Erreur', 'Impossible de rechercher le client');
+   }
   }, []);
 
   // const handleClose = useCallback(() => {
@@ -384,12 +388,20 @@ const QRScannerCompo: React.FC<Props> = ({handleClose}) => {
     />
 
     <BottomSheetCompo bottomSheetModalRef={bottomSheetModalRef} snapPoints={["100%"]}>
-      <View style={{position: "absolute", top: Rs(20), right: Rs(20), zIndex: 1}}>
-
-        <BackButton
-          backAction={() => bottomSheetModalRef.current?.close()}
-          icon={<Feather size={Rs(18)} name="x" color={colors.red} />}
-        />
+      <View style={{ position: 'absolute', top: spacing.xl, right: spacing.xl, zIndex: 1 }}>
+        <TouchableOpacity
+          onPress={() => bottomSheetModalRef.current?.close()}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            backgroundColor: themeColors.errorContainer,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Feather size={18} name="x" color={themeColors.error} />
+        </TouchableOpacity>
       </View>
        <SubscriptionCore />
     </BottomSheetCompo>

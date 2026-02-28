@@ -1,11 +1,11 @@
-import { MMKV } from 'react-native-mmkv'
+import { createMMKV } from 'react-native-mmkv'
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { SOTRE_KEYS } from './KEYS'
 import { IAgent, IAuth } from '@/interfaces'
 
 // Initialize MMKV storage
-export const storage = new MMKV()
+export const storage = createMMKV()
 
 // Create storage interface for Zustand persist middleware
 const mmkvStorage = {
@@ -18,7 +18,7 @@ const mmkvStorage = {
   return Promise.resolve()
  },
  removeItem: (name: string) => {
-  storage.delete(name)
+  storage.remove(name)
   return Promise.resolve()
  },
 }
@@ -68,5 +68,5 @@ export const getStorageItem = (key: string) => {
 }
 
 export const removeStorageItem = (key: string) => {
- storage.delete(key)
+ storage.remove(key)
 }
