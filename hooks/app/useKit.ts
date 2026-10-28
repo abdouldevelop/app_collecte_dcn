@@ -22,7 +22,7 @@ export const useKit = () => {
       const newKit = await database.write(async () => {
         return await database.get<Kit>('kits').create((kit) => {
           kit.label = label
-          kit.saison.set(saisonId)
+          kit.saisonId = saisonId
           kit.montantTotal = montantTotal
           kit.createdAt = Date.now()
         })
@@ -85,7 +85,7 @@ export const useKit = () => {
         
         return await kit.update((record) => {
           if (updates.label !== undefined) record.label = updates.label
-          if (updates.saisonId) record.saison.set(updates.saisonId)
+          if (updates.saisonId) record.saisonId = updates.saisonId
           if (updates.montantTotal !== undefined) record.montantTotal = updates.montantTotal
         })
       })
@@ -195,7 +195,7 @@ export const useKit = () => {
         for (const data of kitsData) {
           const kit = await database.get<Kit>('kits').create((record) => {
             record.label = data.label
-            record.saison.set(data.saisonId)
+            record.saisonId = data.saisonId
             record.montantTotal = data.montantTotal
             record.createdAt = Date.now()
           })

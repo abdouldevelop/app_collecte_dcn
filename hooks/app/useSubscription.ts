@@ -33,9 +33,9 @@ export const useSouscription = () => {
     try {
       const newSouscription = await database.write(async () => {
         return await database.get<Souscription>('souscriptions').create((souscription) => {
-          souscription.client.set(clientId)
-          souscription.kit.set(kitId)
-          souscription.saison.set(saisonId)
+          souscription.clientId = clientId
+          souscription.kitId = kitId
+          souscription.saisonId = saisonId
           souscription.statut = statut
           souscription.createdAt = Date.now()
         })
@@ -69,9 +69,9 @@ export const useSouscription = () => {
         const souscription = await database.get<Souscription>('souscriptions').find(souscriptionId)
         
         return await souscription.update((record) => {
-          if (updates.clientId) record.client.set(updates.clientId)
-          if (updates.kitId) record.kit.set(updates.kitId)
-          if (updates.saisonId) record.saison.set(updates.saisonId)
+          if (updates.clientId) record.clientId = updates.clientId
+          if (updates.kitId) record.kitId = updates.kitId
+          if (updates.saisonId) record.saisonId = updates.saisonId
           if (updates.statut) record.statut = updates.statut
         })
       })

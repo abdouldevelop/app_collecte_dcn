@@ -90,23 +90,23 @@ export interface AppColors {
 }
 
 export const lightColors: AppColors = {
-  // --- Primary (Indigo) ---
-  primary: '#6366F1',
-  primaryContainer: '#E0E7FF',
+  // --- Primary (Blue) ---
+  primary: '#2563EB',
+  primaryContainer: '#DBEAFE',
   onPrimary: '#FFFFFF',
-  onPrimaryContainer: '#312E81',
+  onPrimaryContainer: '#1E3A8A',
 
-  // --- Secondary (Violet) ---
-  secondary: '#8B5CF6',
-  secondaryContainer: '#EDE9FE',
+  // --- Secondary (Sky) ---
+  secondary: '#0EA5E9',
+  secondaryContainer: '#E0F2FE',
   onSecondary: '#FFFFFF',
-  onSecondaryContainer: '#4C1D95',
+  onSecondaryContainer: '#075985',
 
-  // --- Tertiary (Rose) ---
-  tertiary: '#EC4899',
-  tertiaryContainer: '#FCE7F3',
+  // --- Tertiary (Cyan) ---
+  tertiary: '#06B6D4',
+  tertiaryContainer: '#CFFAFE',
   onTertiary: '#FFFFFF',
-  onTertiaryContainer: '#831843',
+  onTertiaryContainer: '#164E63',
 
   // --- Error ---
   error: '#DC2626',
@@ -151,14 +151,14 @@ export const lightColors: AppColors = {
   scrim: 'rgba(0, 0, 0, 0.32)',
   inverseSurface: '#313033',
   inverseOnSurface: '#F4EFF4',
-  inversePrimary: '#C7D2FE',
+  inversePrimary: '#93C5FD',
   shadow: '#000000',
 
   // --- Gradients ---
   gradient: {
-    primary: ['#6366F1', '#8B5CF6'],
-    secondary: ['#8B5CF6', '#EC4899'],
-    warm: ['#6366F1', '#8B5CF6', '#EC4899'],
+    primary: ['#2563EB', '#1E40AF'],
+    secondary: ['#0EA5E9', '#2563EB'],
+    warm: ['#2563EB', '#0EA5E9', '#06B6D4'],
   },
 
   // --- Dashboard accents ---
@@ -175,23 +175,23 @@ export const lightColors: AppColors = {
 };
 
 export const darkColors: AppColors = {
-  // --- Primary (Indigo) ---
-  primary: '#A5B4FC',
-  primaryContainer: '#4338CA',
-  onPrimary: '#1E1B4B',
-  onPrimaryContainer: '#E0E7FF',
+  // --- Primary (Blue) ---
+  primary: '#93C5FD',
+  primaryContainer: '#1E40AF',
+  onPrimary: '#0B1E45',
+  onPrimaryContainer: '#DBEAFE',
 
-  // --- Secondary (Violet) ---
-  secondary: '#C4B5FD',
-  secondaryContainer: '#6D28D9',
-  onSecondary: '#2E1065',
-  onSecondaryContainer: '#EDE9FE',
+  // --- Secondary (Sky) ---
+  secondary: '#7DD3FC',
+  secondaryContainer: '#075985',
+  onSecondary: '#082F49',
+  onSecondaryContainer: '#E0F2FE',
 
-  // --- Tertiary (Rose) ---
-  tertiary: '#F9A8D4',
-  tertiaryContainer: '#9D174D',
-  onTertiary: '#500724',
-  onTertiaryContainer: '#FCE7F3',
+  // --- Tertiary (Cyan) ---
+  tertiary: '#67E8F9',
+  tertiaryContainer: '#155E75',
+  onTertiary: '#083344',
+  onTertiaryContainer: '#CFFAFE',
 
   // --- Error ---
   error: '#FCA5A5',
@@ -236,14 +236,14 @@ export const darkColors: AppColors = {
   scrim: 'rgba(0, 0, 0, 0.64)',
   inverseSurface: '#E6E1E5',
   inverseOnSurface: '#313033',
-  inversePrimary: '#6366F1',
+  inversePrimary: '#2563EB',
   shadow: '#000000',
 
   // --- Gradients ---
   gradient: {
-    primary: ['#4338CA', '#6D28D9'],
-    secondary: ['#6D28D9', '#9D174D'],
-    warm: ['#4338CA', '#6D28D9', '#9D174D'],
+    primary: ['#1E3A8A', '#2563EB'],
+    secondary: ['#0C4A6E', '#1D4ED8'],
+    warm: ['#1E3A8A', '#0C4A6E', '#155E75'],
   },
 
   // --- Dashboard accents ---

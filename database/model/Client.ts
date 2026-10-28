@@ -16,5 +16,5 @@ export default class Client extends Model {
   @date('created_at') createdAt !: number
   @date('updated_at') updatedAt !: number
 
-  @children('souscriptions') souscriptions !: import('@nozbe/watermelondb').Relation<Souscription>
+  @children('souscriptions') souscriptions !: import('@nozbe/watermelondb').Query<Souscription>
 }

@@ -13,8 +13,8 @@ export default class Souscription extends Model {
     kits: { type: 'belongs_to', key: 'kit_id' },
     saisons: { type: 'belongs_to', key: 'saison_id' },
     // Keep the has_many association
-    versements: { type: 'has_many', foreignKey: 'souscription_id' }, // Remove 'as const'
-  }
+    versements: { type: 'has_many', foreignKey: 'souscription_id' },
+  } as const
 
   // Add the foreign key fields first
   @field('client_id') clientId !: string
@@ -27,5 +27,5 @@ export default class Souscription extends Model {
   @relation('clients', 'client_id') client !: import('@nozbe/watermelondb').Relation<Client>
   @relation('kits', 'kit_id') kit !: import('@nozbe/watermelondb').Relation<Kit>
   @relation('saisons', 'saison_id') saison !: import('@nozbe/watermelondb').Relation<Saison>
-  @children('versements') versements !: import('@nozbe/watermelondb').Relation<Versement>
+  @children('versements') versements !: import('@nozbe/watermelondb').Query<Versement>
 }

@@ -14,8 +14,12 @@ const api = ky.create({
   hooks: {
     beforeRequest: [
       async (request) => {
+        // Une connexion doit toujours être faite sans le jeton potentiellement
+        // expiré du compte précédent.
+        if (request.url.includes('agents/login')) return;
         const user = getStorageItem("USER");
-        const token = user?.data?.token;
+        // L'API a existé avec les deux formes { token } et { data: { token } }.
+        const token = user?.token ?? user?.data?.token;
         if (token) {
           request.headers.set("Authorization", `Bearer ${token}`);
         }
@@ -23,7 +27,9 @@ const api = ky.create({
     ],
    afterResponse: [
   async (request, options, response) => {
-    // Si le serveur répond 401, le token a expiré → déconnexion
+    // Si le serveur répond 401, le token a expiré. On ferme la session mais on
+    // conserve la base et son propriétaire : une reconnexion du même compte
+    // peut reprendre la synchronisation, sans exposer ces données à un autre.
     if (response.status === 401 && !request.url.includes('agents/login')) {
       removeStorageItem("USER");
       agentStore.getState().logout();

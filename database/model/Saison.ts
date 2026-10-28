@@ -13,5 +13,5 @@ export default class Saison extends Model {
   @date('end') end !: number
   @field('active') active !: boolean
 
-  @children('kits') kits !: import('@nozbe/watermelondb').Relation<Kit>
+  @children('kits') kits !: import('@nozbe/watermelondb').Query<Kit>
 }

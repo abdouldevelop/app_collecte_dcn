@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo } from 'react';
 import {
-  ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
@@ -10,6 +9,7 @@ import {
   type ViewStyle,
   type TextStyle,
 } from 'react-native';
+import { AppLoader } from './AppLoader';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -214,9 +214,10 @@ export function AppButton({
   const renderContent = () => (
     <View style={styles.contentRow}>
       {loading ? (
-        <ActivityIndicator
-          size="small"
+        <AppLoader
+          size={sizeConfig.iconSize + 6}
           color={variantStyles.loaderColor}
+          variant="ring"
           style={styles.loader}
         />
       ) : (

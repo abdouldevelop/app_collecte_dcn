@@ -39,3 +39,15 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+.next/
+.gradle/
+android/.gradle/
+android/build/
+android/app/build/
+android/app/.cxx/
+.env
+.env.local
+*.apk
+*.aab
+*.zip
+*.tar.gz

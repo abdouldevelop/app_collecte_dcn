@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { View, StyleSheet, useWindowDimensions, type ViewStyle } from 'react-native';
+import { View, StyleSheet, useWindowDimensions, type ViewStyle, type DimensionValue } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -30,7 +30,7 @@ export type SkeletonVariant = 'text' | 'circle' | 'rect' | 'card';
 
 export interface AppSkeletonProps {
   /** Width of the skeleton. Number (pixels) or string (e.g. "100%"). */
-  width?: number | string;
+  width?: DimensionValue;
   /** Height of the skeleton in pixels. */
   height?: number;
   /** Visual variant determining shape and layout. */
@@ -97,7 +97,7 @@ const ShimmerOverlay = React.memo(ShimmerOverlayInner);
 // ============================================================
 
 interface BoneProps {
-  width: number | string;
+  width: DimensionValue;
   height: number;
   borderRadius: number;
   style?: ViewStyle;

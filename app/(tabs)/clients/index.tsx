@@ -1,13 +1,10 @@
 import { ScrollView, Text, View, Pressable } from 'react-native';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { BottomSheetModal } from '@gorhom/bottom-sheet';
 import Animated, {
   FadeIn,
   FadeInRight,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,11 +18,14 @@ import Client from '@/database/model/Client';
 import Kit from '@/database/model/Kit';
 import Souscription from '@/database/model/Souscription';
 import EnhancedClientKitItem from '@/features/dashboard/client/clients-kit-item';
+import EnhancedClientItem from '@/features/dashboard/client/clients-item';
 import AddClient from '@/features/dashboard/client/add-client';
 
 // ============================================================
 // TYPES
 // ============================================================
+
+type ViewMode = 'clients' | 'subscriptions';
 
 type Props = {
   clients?: Client[];
@@ -94,20 +94,25 @@ const Page = ({ clients, subscriptions, kits }: Props) => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedKitId, setSelectedKitId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('clients');
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
+
+  // --- Filter clients based on search query ---
+  const filteredClients = useMemo(() => {
+    if (!clients) return [];
+    if (!searchQuery.trim()) return clients;
+    const q = searchQuery.toLowerCase();
+    return clients.filter(
+      (client) =>
+        client.firstName?.toLowerCase().includes(q) ||
+        client.lastName?.toLowerCase().includes(q) ||
+        client.phone?.includes(searchQuery),
+    );
+  }, [clients, searchQuery]);
 
   // --- Filter clients based on search query → get matching IDs ---
   const matchingClientIds = searchQuery.trim()
-    ? new Set(
-        clients
-          ?.filter(
-            (client) =>
-              client.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              client.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              client.phone?.includes(searchQuery),
-          )
-          .map((c) => c.id),
-      )
+    ? new Set(filteredClients.map((c) => c.id))
     : null;
 
   // --- Filter subscriptions based on selected kit + search query ---
@@ -152,8 +157,40 @@ const Page = ({ clients, subscriptions, kits }: Props) => {
             Clients
           </Text>
           <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, marginTop: spacing.xxs }]}>
-            {subscriptions?.length || 0} souscription{(subscriptions?.length || 0) > 1 ? 's' : ''}
+            {clients?.length || 0} client{(clients?.length || 0) > 1 ? 's' : ''} · {subscriptions?.length || 0} souscription{(subscriptions?.length || 0) > 1 ? 's' : ''}
           </Text>
+        </View>
+
+        {/* ── View Mode Toggle ────────────────────────────── */}
+        <View style={{ flexDirection: 'row', marginHorizontal: spacing.xl, marginBottom: spacing.sm, borderRadius: radius.lg, backgroundColor: colors.surfaceContainerHigh, padding: 3 }}>
+          <Pressable
+            onPress={() => setViewMode('clients')}
+            style={{
+              flex: 1,
+              paddingVertical: spacing.sm,
+              borderRadius: radius.md,
+              backgroundColor: viewMode === 'clients' ? colors.surface : 'transparent',
+              alignItems: 'center',
+            }}
+          >
+            <Text style={[typography.labelMedium, { color: viewMode === 'clients' ? colors.onSurface : colors.onSurfaceVariant }]}>
+              Clients
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setViewMode('subscriptions')}
+            style={{
+              flex: 1,
+              paddingVertical: spacing.sm,
+              borderRadius: radius.md,
+              backgroundColor: viewMode === 'subscriptions' ? colors.surface : 'transparent',
+              alignItems: 'center',
+            }}
+          >
+            <Text style={[typography.labelMedium, { color: viewMode === 'subscriptions' ? colors.onSurface : colors.onSurfaceVariant }]}>
+              Souscriptions
+            </Text>
+          </Pressable>
         </View>
 
         {/* ── Search ────────────────────────────────────────── */}
@@ -165,47 +202,48 @@ const Page = ({ clients, subscriptions, kits }: Props) => {
           />
         </View>
 
-        {/* ── Kit Filter Chips (fixed, not scrolling vertically) ── */}
-        <View style={{ marginBottom: spacing.sm }}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: spacing.sm, paddingHorizontal: spacing.xl }}
-          >
-            {/* "Tous" chip */}
-            <Pressable onPress={() => setSelectedKitId(null)}>
-              <View
-                style={{
-                  paddingVertical: spacing.sm,
-                  paddingHorizontal: spacing.md,
-                  borderRadius: radius.full,
-                  borderWidth: 1,
-                  borderColor: !selectedKitId ? colors.primary : colors.outlineVariant,
-                  backgroundColor: !selectedKitId ? colors.primaryContainer : colors.surface,
-                }}
-              >
-                <Text
-                  style={[
-                    typography.labelMedium,
-                    { color: !selectedKitId ? colors.onPrimaryContainer : colors.onSurfaceVariant },
-                  ]}
+        {/* ── Kit Filter Chips (only in subscriptions mode) ── */}
+        {viewMode === 'subscriptions' && (
+          <View style={{ marginBottom: spacing.sm }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: spacing.sm, paddingHorizontal: spacing.xl }}
+            >
+              <Pressable onPress={() => setSelectedKitId(null)}>
+                <View
+                  style={{
+                    paddingVertical: spacing.sm,
+                    paddingHorizontal: spacing.md,
+                    borderRadius: radius.full,
+                    borderWidth: 1,
+                    borderColor: !selectedKitId ? colors.primary : colors.outlineVariant,
+                    backgroundColor: !selectedKitId ? colors.primaryContainer : colors.surface,
+                  }}
                 >
-                  Tous ({subscriptions?.length || 0})
-                </Text>
-              </View>
-            </Pressable>
+                  <Text
+                    style={[
+                      typography.labelMedium,
+                      { color: !selectedKitId ? colors.onPrimaryContainer : colors.onSurfaceVariant },
+                    ]}
+                  >
+                    Tous ({subscriptions?.length || 0})
+                  </Text>
+                </View>
+              </Pressable>
 
-            {kits?.map((kit) => (
-              <KitChip
-                key={kit.id}
-                kit={kit}
-                isSelected={selectedKitId === kit.id}
-                count={getKitSubscriptionCount(kit.id)}
-                onPress={() => handleKitPress(kit.id)}
-              />
-            ))}
-          </ScrollView>
-        </View>
+              {kits?.map((kit) => (
+                <KitChip
+                  key={kit.id}
+                  kit={kit}
+                  isSelected={selectedKitId === kit.id}
+                  count={getKitSubscriptionCount(kit.id)}
+                  onPress={() => handleKitPress(kit.id)}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* ── Client List ──────────────────────────────────── */}
         <ScrollView
@@ -218,44 +256,78 @@ const Page = ({ clients, subscriptions, kits }: Props) => {
             paddingBottom: 70 + insets.bottom + spacing.xl,
           }}
         >
-          {filteredSubscriptions?.map((item, index) => (
-            <Animated.View
-              key={item?.id}
-              entering={FadeInRight.delay(Math.min(index, 10) * 40)
-                .springify()
-                .damping(18)}
-            >
-              <EnhancedClientKitItem subs={item} />
-            </Animated.View>
-          ))}
+          {/* ── Clients View ── */}
+          {viewMode === 'clients' && (
+            <>
+              {filteredClients.map((client, index) => (
+                <Animated.View
+                  key={client.id}
+                  entering={FadeInRight.delay(Math.min(index, 10) * 40)
+                    .springify()
+                    .damping(18)}
+                >
+                  <EnhancedClientItem client={client} />
+                </Animated.View>
+              ))}
 
-          {/* Empty State: search with no results */}
-          {filteredSubscriptions?.length === 0 && searchQuery.trim() && (
-            <AppEmptyState
-              icon="search"
-              title="Aucun resultat"
-              description={`Aucun client trouve pour "${searchQuery}".`}
-            />
+              {filteredClients.length === 0 && searchQuery.trim() && (
+                <AppEmptyState
+                  icon="search"
+                  title="Aucun résultat"
+                  description={`Aucun client trouvé pour "${searchQuery}".`}
+                />
+              )}
+
+              {clients?.length === 0 && !searchQuery.trim() && (
+                <AppEmptyState
+                  icon="users"
+                  title="Aucun client"
+                  description="Ajoutez votre premier client."
+                  actionLabel="Ajouter un client"
+                  onAction={handleOpenAddClient}
+                />
+              )}
+            </>
           )}
 
-          {/* Empty State: filter active, no results */}
-          {filteredSubscriptions?.length === 0 && selectedKitId && !searchQuery.trim() && (
-            <AppEmptyState
-              icon="package"
-              title="Aucune souscription"
-              description="Aucune souscription trouvee pour ce kit."
-            />
-          )}
+          {/* ── Subscriptions View ── */}
+          {viewMode === 'subscriptions' && (
+            <>
+              {filteredSubscriptions?.map((item, index) => (
+                <Animated.View
+                  key={item?.id}
+                  entering={FadeInRight.delay(Math.min(index, 10) * 40)
+                    .springify()
+                    .damping(18)}
+                >
+                  <EnhancedClientKitItem subs={item} />
+                </Animated.View>
+              ))}
 
-          {/* Empty State: no subscriptions at all */}
-          {subscriptions?.length === 0 && !selectedKitId && !searchQuery.trim() && (
-            <AppEmptyState
-              icon="users"
-              title="Aucun client"
-              description="Ajoutez votre premier client."
-              actionLabel="Ajouter un client"
-              onAction={handleOpenAddClient}
-            />
+              {filteredSubscriptions?.length === 0 && searchQuery.trim() && (
+                <AppEmptyState
+                  icon="search"
+                  title="Aucun résultat"
+                  description={`Aucun client trouvé pour "${searchQuery}".`}
+                />
+              )}
+
+              {filteredSubscriptions?.length === 0 && selectedKitId && !searchQuery.trim() && (
+                <AppEmptyState
+                  icon="package"
+                  title="Aucune souscription"
+                  description="Aucune souscription trouvée pour ce kit."
+                />
+              )}
+
+              {subscriptions?.length === 0 && !selectedKitId && !searchQuery.trim() && (
+                <AppEmptyState
+                  icon="users"
+                  title="Aucune souscription"
+                  description="Aucun client n'a encore de souscription."
+                />
+              )}
+            </>
           )}
         </ScrollView>
       </SafeAreaView>

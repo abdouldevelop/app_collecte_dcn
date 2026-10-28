@@ -60,7 +60,7 @@ const LastedPayment = ({ versements }: Props) => {
 
 const enhance = withObservables([], () => ({
   versements: database
-    .get('versements')
+    .get<Versement>('versements')
     .query(Q.sortBy('created_at', Q.desc), Q.take(3))
     .observeWithColumns(['amount', 'date_versement', 'souscription_id']),
 }));

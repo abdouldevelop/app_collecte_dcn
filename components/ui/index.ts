@@ -6,6 +6,9 @@
 export { AppButton } from './AppButton';
 export type { AppButtonProps } from './AppButton';
 
+export { AppLoader } from './AppLoader';
+export type { AppLoaderProps } from './AppLoader';
+
 export { AppInput, FormInput } from './AppInput';
 export type { AppInputProps, FormInputProps } from './AppInput';
 

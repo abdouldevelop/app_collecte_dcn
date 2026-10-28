@@ -12,5 +12,5 @@ export default class Agent extends Model {
   @field('last_name') lastName !: string
   @field('phone') phone !: string
 
-  @children('versements') versements!: import('@nozbe/watermelondb').Relation<Versement>
+  @children('versements') versements!: import('@nozbe/watermelondb').Query<Versement>
 }

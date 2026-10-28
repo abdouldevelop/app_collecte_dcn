@@ -11,7 +11,7 @@ export default class Kit extends Model {
   static associations = {
     saisons: { type: 'belongs_to', key: 'saison_id' },
     souscriptions: { type: 'has_many', foreignKey: 'kit_id' },
-  }
+  } as const
 
   @field('label') label !: string
   @field('saison_id') saisonId !: string
@@ -19,5 +19,5 @@ export default class Kit extends Model {
   @date('created_at') createdAt !: number
 
   @relation('saisons', 'saison_id') saison !: import('@nozbe/watermelondb').Relation<Saison>
-  @children('souscriptions') souscriptions !: import('@nozbe/watermelondb').Relation<Souscription>
+  @children('souscriptions') souscriptions !: import('@nozbe/watermelondb').Query<Souscription>
 }

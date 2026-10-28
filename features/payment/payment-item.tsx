@@ -79,7 +79,7 @@ const PaymentItem = ({ versement }: Props) => {
 };
 
 const enhance = withObservables(['versement'], ({ versement }: { versement: Versement }) => ({
-  versement: versement ? versement.observe() : null,
+  versement: versement.observe(),
 }));
 
 export default enhance(PaymentItem);

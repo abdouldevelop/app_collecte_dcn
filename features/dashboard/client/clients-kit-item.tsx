@@ -133,9 +133,9 @@ const ClientKitItem = ({ client, kit, subs, payments, clientSubscriptions }: Pro
 const enhance = withObservables(
   ['subs'],
   ({ subs }: { subs: Souscription }) => ({
-    subs: subs ? subs.observe() : null,
-    client: subs ? subs.client.observe() : null,
-    kit: subs ? subs.kit.observe() : null,
+    subs: subs.observe(),
+    client: subs.client.observe(),
+    kit: subs.kit.observe(),
     payments: database.collections
       .get<Versement>('versements')
       .query(

@@ -80,7 +80,7 @@ const LastedClients = ({ clients }: Props) => {
 
 const enhance = withObservables([], () => ({
   clients: database
-    .get('clients')
+    .get<Client>('clients')
     .query(Q.sortBy('created_at', Q.desc), Q.take(3))
     .observeWithColumns(['first_name', 'last_name', 'phone', 'updated_at']),
 }));

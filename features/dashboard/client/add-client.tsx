@@ -38,7 +38,7 @@ const AddClient = ({ closeModal }: Props) => {
           newClient.firstName = data.firstName.trim();
           newClient.lastName = data.lastName.trim();
           newClient.phone = data.phone.trim();
-          newClient.agentId = agent?.agent?.id;
+          newClient.agentId = agent?.agent?.id ?? '';
         });
 
         if (client.id) {

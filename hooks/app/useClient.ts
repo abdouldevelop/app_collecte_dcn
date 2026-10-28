@@ -7,7 +7,7 @@ interface CreateClientData {
   lastName: string
   phone: string
   numeroOrdre: string
-  agentId: number
+  agentId: string
 }
 
 interface UpdateClientData {
@@ -65,7 +65,7 @@ export const useClients = (database: Database): UseClientsReturn => {
           client.lastName = data.lastName
           client.phone = data.phone
           client.numeroOrdre = data.numeroOrdre
-          client.agentId = 1
+          client.agentId = data.agentId
           client.createdAt = Date.now()
           client.updatedAt = Date.now()
         })

@@ -140,11 +140,10 @@ export function checkDateDifferenceMatches(
 }
 
 export function formatXOF(amount: number) {
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'XOF',
-    minimumFractionDigits: 0
-  }).format(amount);
+  const formatted = new Intl.NumberFormat('fr-FR', {
+    maximumFractionDigits: 0,
+  }).format(amount || 0);
+  return `${formatted} F`;
 }
 
 export function formatIvoryCoastPhoneNumber(input: string) {

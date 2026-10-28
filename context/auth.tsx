@@ -1,5 +1,4 @@
-import { agentStore, getStorageItem, removeStorageItem } from '@/storage/MMKV'
-import React, { createContext, useEffect, useState } from 'react'
+import React, { createContext, useState } from 'react'
 
 type AuthContextType = {
   user: any
@@ -18,18 +17,6 @@ export const AuthContext = createContext<AuthContextType>({
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<any>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const {login: auth} = agentStore();
-
-
-  useEffect(() => {
-    const loadUser = async () => {
-      const storedUser = await getStorageItem("USER");
-      // if (storedUser) {
-      //    auth();
-      // }
-    }
-    loadUser()
-  }, [])
 
   const login = async (userData: any) => {
     setUser(userData)

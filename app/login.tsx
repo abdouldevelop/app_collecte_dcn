@@ -9,9 +9,11 @@ import {
   ToastAndroid,
   StyleSheet,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeInDown, FadeIn, FadeOut } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { HTTPError } from 'ky';
@@ -22,19 +24,21 @@ import { loginSchema, LoginSchemaData } from '@/schema';
 import { http } from '@/shared/http';
 import { IAuth, TError } from '@/interfaces';
 import { agentStore, setStorageItem } from '@/storage/MMKV';
-import { syncWithBackend } from '@/database/db_utils';
+import { prepareDatabaseForAccount, syncWithBackend } from '@/database/db_utils';
+import { hashSecret } from '@/shared/crypto';
 
 const Page = () => {
-  const { colors, spacing, typography, radius } = useAppTheme();
+  const { colors, spacing, typography, radius, elevation } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-  const { login } = agentStore();
+  const { authenticate } = agentStore();
 
   const {
     handleSubmit,
     control,
-    formState: { errors },
   } = useForm<LoginSchemaData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -45,38 +49,45 @@ const Page = () => {
 
   async function onSubmit(data: LoginSchemaData) {
     Keyboard.dismiss();
+    setError(null);
     setIsLoading(true);
     try {
       const response = await http.post('agents/login', data);
       if (response) {
-        console.log('resp===', response);
         const agent = response as IAuth;
+
+        // L'identifiant serveur est prioritaire. Le téléphone normalisé sert
+        // uniquement de secours pour les anciennes réponses de l'API.
+        const normalizedPhone = (agent?.agent?.phone ?? data.phone).replace(/\D/g, '');
+        const accountId = String(agent?.agent?.id ?? normalizedPhone);
+        const preparation = await prepareDatabaseForAccount(accountId, normalizedPhone);
+        if (!preparation.success) {
+          setError(
+            `${preparation.pendingCount} donnée(s) de l'ancien compte ne sont pas synchronisée(s). ` +
+            `Reconnectez-vous avec l'ancien compte et synchronisez-les avant de changer de compte.`
+          );
+          return;
+        }
+
         await setStorageItem('USER', response);
-        login(agent);
-        ToastAndroid.show('Connexion reussie — synchronisation...', ToastAndroid.SHORT);
-        // Sync immediate apres connexion
-        syncWithBackend().then((result) => {
-          if (result.success) {
-            ToastAndroid.show(
-              `Sync OK — ${result.pullCount || 0} recu(s), ${result.pushCount || 0} envoye(s)`,
-              ToastAndroid.SHORT,
-            );
-          } else {
-            ToastAndroid.show('Echec de la synchronisation', ToastAndroid.SHORT);
-          }
-        });
+        // Mémorise le compte + le hash du mot de passe pour la reconnexion hors-ligne
+        const passwordHash = await hashSecret(data.password);
+        authenticate(agent, passwordHash);
+        const sync = await syncWithBackend();
+        ToastAndroid.show(
+          sync.success ? 'Connexion et synchronisation réussies' : 'Connexion réussie, synchronisation différée',
+          ToastAndroid.SHORT
+        );
       }
     } catch (err) {
-      console.log(err);
       if (err instanceof HTTPError) {
-        const errorData: TError = await err.response.json().catch(() => ({
-          message: 'Unexpected error',
+        const errorData: TError = (err as any).parsedBody ?? await err.response.clone().json().catch(() => ({
+          message: 'Une erreur est survenue',
           statusCode: err.response.status,
         }));
         setError(errorData.message);
-        setTimeout(() => {
-          setError(null);
-        }, 2000);
+      } else {
+        setError('Connexion impossible. Vérifiez votre réseau.');
       }
     } finally {
       setIsLoading(false);
@@ -84,127 +95,174 @@ const Page = () => {
   }
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      {/* Subtle gradient background tint */}
-      <LinearGradient
-        colors={[
-          `${colors.gradient.primary[0]}14`,
-          `${colors.gradient.primary[1]}14`,
-          colors.background,
-        ]}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar style="light" />
 
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
           style={styles.flex}
-          contentContainerStyle={[
-            styles.scrollContent,
-            {
-              paddingHorizontal: spacing.xl,
-              paddingTop: spacing.xxxxl,
-              paddingBottom: spacing.xxl,
-              gap: spacing.xl,
-            },
-          ]}
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           bounces={false}
           keyboardDismissMode="interactive"
         >
-          {/* Header section */}
-          <View style={{ gap: spacing.sm, marginBottom: spacing.lg }}>
-            <Animated.Text
+          {/* ── HERO (dégradé bleu + marque) ─────────────────── */}
+          <LinearGradient
+            colors={[colors.gradient.primary[0], colors.gradient.primary[1]] as const}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              paddingTop: insets.top + spacing.xxl,
+              paddingBottom: spacing.xxxl,
+              paddingHorizontal: spacing.xl,
+              borderBottomLeftRadius: radius.xxl,
+              borderBottomRightRadius: radius.xxl,
+              alignItems: 'center',
+              gap: spacing.md,
+            }}
+          >
+            <Animated.View
               entering={FadeInDown.delay(0).springify()}
-              style={[
-                typography.displayLarge,
-                { color: colors.onSurface },
-              ]}
+              style={{
+                width: 76,
+                height: 76,
+                borderRadius: radius.xl,
+                backgroundColor: 'rgba(255,255,255,0.18)',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.25)',
+              }}
             >
-              Bienvenue
+              <Ionicons name="wallet" size={38} color="#FFFFFF" />
+            </Animated.View>
+
+            <Animated.Text
+              entering={FadeInDown.delay(80).springify()}
+              style={[typography.displayMedium, { color: '#FFFFFF' }]}
+            >
+              APP-COLLECTE
             </Animated.Text>
             <Animated.Text
-              entering={FadeInDown.delay(100).springify()}
-              style={[
-                typography.bodyLarge,
-                { color: colors.onSurfaceVariant },
-              ]}
+              entering={FadeInDown.delay(140).springify()}
+              style={[typography.bodyMedium, { color: 'rgba(255,255,255,0.85)', textAlign: 'center' }]}
             >
-              Connectez-vous pour continuer
+              La collecte de vos versements, simplifiée
             </Animated.Text>
-          </View>
+          </LinearGradient>
 
-          {/* Form inputs */}
-          <View style={{ gap: spacing.sm }}>
-            <FormInput
-              control={control}
-              name="phone"
-              label="Telephone"
-              leftIcon="phone"
-              keyboardType="phone-pad"
-              placeholder="00 00 00 00 00"
-            />
+          {/* ── CARTE FORMULAIRE (remonte sur le héro) ───────── */}
+          <View style={{ paddingHorizontal: spacing.xl, marginTop: -spacing.xl }}>
+            <Animated.View
+              entering={FadeInDown.delay(200).springify()}
+              style={{
+                backgroundColor: colors.surface,
+                borderRadius: radius.xl,
+                padding: spacing.xl,
+                gap: spacing.md,
+                ...elevation.lg,
+              }}
+            >
+              <View style={{ gap: spacing.xxs, marginBottom: spacing.sm }}>
+                <Text style={[typography.headlineMedium, { color: colors.onSurface }]}>
+                  Bon retour 👋
+                </Text>
+                <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant }]}>
+                  Connectez-vous pour continuer
+                </Text>
+              </View>
 
-            <FormInput
-              control={control}
-              name="password"
-              label="Mot de passe"
-              leftIcon="lock"
-              secureTextEntry
-              placeholder="********"
-            />
-          </View>
+              <FormInput
+                control={control}
+                name="phone"
+                label="Téléphone"
+                leftIcon="phone"
+                keyboardType="phone-pad"
+                placeholder="00 00 00 00 00"
+              />
 
-          {/* Login button */}
-          <AppButton
-            label="Connexion"
-            variant="filled"
-            gradient
-            fullWidth
-            size="lg"
-            loading={isLoading}
-            disabled={isLoading}
-            onPress={handleSubmit(onSubmit)}
-          />
+              <FormInput
+                control={control}
+                name="password"
+                label="Mot de passe"
+                leftIcon="lock"
+                secureTextEntry={!showPassword}
+                rightIcon={showPassword ? 'eye-off' : 'eye'}
+                rightIconPress={() => setShowPassword((v) => !v)}
+                placeholder="••••••••"
+              />
 
-          {/* Error message */}
-          {error && (
+              {/* Bandeau d'erreur */}
+              {error && (
+                <Animated.View
+                  entering={FadeIn.duration(250)}
+                  exiting={FadeOut.duration(200)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: spacing.sm,
+                    backgroundColor: colors.errorContainer,
+                    borderRadius: radius.sm,
+                    paddingVertical: spacing.sm,
+                    paddingHorizontal: spacing.md,
+                  }}
+                >
+                  <Feather name="alert-circle" size={18} color={colors.error} />
+                  <Text
+                    style={[typography.bodySmall, { color: colors.onErrorContainer, flex: 1 }]}
+                  >
+                    {error}
+                  </Text>
+                </Animated.View>
+              )}
+
+              <AppButton
+                label="Se connecter"
+                variant="filled"
+                gradient
+                fullWidth
+                size="lg"
+                rightIcon="arrow-right"
+                loading={isLoading}
+                disabled={isLoading}
+                onPress={handleSubmit(onSubmit)}
+                style={{ marginTop: spacing.xs }}
+              />
+            </Animated.View>
+
+            {/* Note d'aide */}
             <Animated.Text
-              entering={FadeInDown.duration(400).springify().damping(12)}
-              exiting={FadeOut.duration(300)}
+              entering={FadeIn.delay(400)}
               style={[
-                typography.bodyMedium,
+                typography.caption,
                 {
-                  color: colors.error,
+                  color: colors.onSurfaceVariant,
                   textAlign: 'center',
+                  marginTop: spacing.xl,
                 },
               ]}
             >
-              {error}
+              En cas de problème, contactez votre superviseur.
             </Animated.Text>
-          )}
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 export default Page;
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
   flex: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
+    paddingBottom: 40,
   },
 });

@@ -2,6 +2,7 @@ import { synchronize } from "@nozbe/watermelondb/sync";
 import { database } from "@/database/database";
 import { http } from "@/shared/http";
 import { HTTPError } from "ky";
+import { agentStore, removeStorageItem, storage } from "@/storage/MMKV";
 
 // Types
 interface SyncResult {
@@ -148,9 +149,9 @@ export const syncWithBackend = async (
           const data = response?.data || response;
           const { changes, timestamp } = data;
           
-          pullCount = Object.values(changes).reduce((total, tableChanges: any) => {
-            return total + (tableChanges.created?.length || 0) + 
-                          (tableChanges.updated?.length || 0) + 
+          pullCount = Object.values(changes).reduce<number>((total, tableChanges: any) => {
+            return total + (tableChanges.created?.length || 0) +
+                          (tableChanges.updated?.length || 0) +
                           (tableChanges.deleted?.length || 0);
           }, 0);
 
@@ -180,9 +181,9 @@ export const syncWithBackend = async (
         });
 
         // Count changes being pushed
-        pushCount = Object.values(changes).reduce((total, tableChanges: any) => {
-          return total + (tableChanges.created?.length || 0) + 
-                        (tableChanges.updated?.length || 0) + 
+        pushCount = Object.values(changes).reduce<number>((total, tableChanges: any) => {
+          return total + (tableChanges.created?.length || 0) +
+                        (tableChanges.updated?.length || 0) +
                         (tableChanges.deleted?.length || 0);
         }, 0);
 
@@ -219,13 +220,8 @@ export const syncWithBackend = async (
         }
       },
 
-      // ⚖️ Conflict resolution
-      conflictResolver:
-        options.conflictResolver === "remote"
-          ? undefined
-          : options.conflictResolver === "local"
-          ? () => "local"
-          : undefined,
+      // ⚖️ Conflict resolution : stratégie par défaut de WatermelonDB
+      // (fusion basée sur les colonnes modifiées côté serveur)
 
       migrationsEnabledAtVersion: 1,
     });
@@ -260,6 +256,95 @@ export const syncWithBackend = async (
       success: false,
       error: error instanceof Error ? error.message : "Unknown sync error",
       syncPhase: currentPhase
+    };
+  }
+};
+
+/**
+ * Vide entièrement la base SQLite locale ET le checkpoint de sync (lastPulledAt).
+ * À appeler lors d'un changement de compte pour repartir d'une base vierge :
+ * WatermelonDB stocke `lastPulledAt` dans la base elle-même, donc ce reset
+ * force aussi un pull complet pour le nouveau compte.
+ */
+export const resetLocalDatabase = async () => {
+  await database.write(async () => {
+    await database.unsafeResetDatabase();
+  });
+};
+
+/** Clé du compte auquel appartient le contenu actuel de la base locale. */
+export const DATABASE_OWNER_KEY = "databaseOwnerId";
+
+/**
+ * Empêche d'ouvrir la base d'un agent sous l'identité d'un autre agent.
+ * Retourne false si le changement doit être refusé pour ne pas perdre des
+ * saisies hors-ligne encore non synchronisées.
+ */
+export const prepareDatabaseForAccount = async (
+  accountId: string,
+  normalizedPhone?: string
+) => {
+  // Migration depuis la première correction, qui ne mémorisait que le téléphone.
+  const legacyPhone = storage.getString("lastAgentPhone")?.replace(/\D/g, "");
+  const storedOwner = storage.getString(DATABASE_OWNER_KEY);
+  const isDifferentAccount = storedOwner
+    ? storedOwner !== accountId
+    : Boolean(legacyPhone && normalizedPhone && legacyPhone !== normalizedPhone);
+
+  if (isDifferentAccount) {
+    const pending = await checkLocalChanges();
+    if (pending.hasChanges) {
+      return { success: false as const, pendingCount: pending.totalDirty };
+    }
+    await resetLocalDatabase();
+  }
+
+  storage.set(DATABASE_OWNER_KEY, accountId);
+  return { success: true as const };
+};
+
+export interface LogoutResult {
+  success: boolean;
+  /** true si la déconnexion a été bloquée pour éviter une perte de données locales */
+  blocked?: boolean;
+  /** nombre d'enregistrements encore non synchronisés au moment du blocage */
+  pendingCount?: number;
+  error?: string;
+}
+
+/**
+ * Déconnexion sûre lors d'un changement de compte.
+ *
+ * 1. S'il reste des données locales non synchronisées, tente un push.
+ * 2. S'il en reste encore après le sync (hors-ligne / échec), BLOQUE et
+ *    n'efface rien → aucune perte de versements saisis hors-ligne.
+ * 3. Sinon, vide la base SQLite locale + la session MMKV.
+ */
+export const logoutAndWipe = async (): Promise<LogoutResult> => {
+  try {
+    const before = await checkLocalChanges();
+
+    if (before.hasChanges) {
+      // Tente de pousser les changements en attente avant d'effacer
+      await syncWithBackend();
+      const after = await checkLocalChanges();
+      if (after.hasChanges) {
+        // Toujours des données locales non poussées → on refuse d'effacer
+        return { success: false, blocked: true, pendingCount: after.totalDirty };
+      }
+    }
+
+    await resetLocalDatabase();
+    removeStorageItem("USER");
+    removeStorageItem(DATABASE_OWNER_KEY);
+    removeStorageItem("lastAgentPhone");
+    agentStore.getState().logout();
+    return { success: true };
+  } catch (error) {
+    console.error("❌ logoutAndWipe failed:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Erreur de déconnexion",
     };
   }
 };

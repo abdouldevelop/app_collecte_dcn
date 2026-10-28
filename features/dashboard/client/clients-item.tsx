@@ -46,8 +46,8 @@ const ClientItem = ({ client, souscriptions }: Props) => {
 };
 
 const enhance = withObservables(['client'], ({ client }: { client: Client }) => ({
-  client: client ? client.observe() : null,
-  souscriptions: client ? client.souscriptions.observe() : null,
+  client: client.observe(),
+  souscriptions: client.souscriptions.observe(),
 }));
 
 const EnhancedClientItem = enhance(ClientItem);

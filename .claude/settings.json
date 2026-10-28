@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm ls:*)",
+      "Bash(node -p \"process.arch\")",
+      "Bash(bash)"
+    ]
+  }
+}

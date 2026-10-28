@@ -9,7 +9,7 @@ export default class Versement extends Model {
     // Add ALL the belongs_to associations for foreign keys
     souscriptions: { type: 'belongs_to', key: 'souscription_id' },
     agents: { type: 'belongs_to', key: 'agent_id' },
-  }
+  } as const
 
   // Add the foreign key fields first
   @field('souscription_id') souscriptionId!: string

@@ -96,7 +96,7 @@ const ClientInfo: React.FC<ClientInfoProps> = ({
           variant="filled"
           size="sm"
           gradient
-          icon={<Ionicons name="add" size={18} color="#FFFFFF" />}
+          leftIcon="plus"
           onPress={() => handleSwitch?.()}
         />
       </View>
